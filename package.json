@@ -1,0 +1,19 @@
+{
+  "name": "copy-character-count-plugin",
+  "version": "1.0.0",
+  "description": "Figma plugin: per-text-box character count export from a chosen frame.",
+  "private": true,
+  "scripts": {
+    "build": "npm run build:main && npm run build:ui && npm run bundle:ui",
+    "build:main": "esbuild src/main.ts --bundle --target=es2017 --platform=browser --outfile=dist/main.js",
+    "build:ui": "esbuild src/ui.ts --bundle --target=es2017 --platform=browser --outfile=dist/ui.js",
+    "bundle:ui": "node ./scripts/bundle-ui.js",
+    "watch": "npm run build:main -- --watch & npm run build:ui -- --watch",
+    "tsc": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@figma/plugin-typings": "^1.100.0",
+    "esbuild": "^0.21.0",
+    "typescript": "^5.4.0"
+  }
+}

@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Copy character count</title>
+<style>/* Copy character count — panel styles. Uses Figma's design tokens (CSS vars)
+   where available so the panel adapts to light/dark themes automatically. */
+
+:root {
+  --bg: var(--figma-color-bg, #ffffff);
+  --bg-secondary: var(--figma-color-bg-secondary, #f5f5f5);
+  --bg-tertiary: var(--figma-color-bg-tertiary, #e5e5e5);
+  --bg-hover: var(--figma-color-bg-hover, #f0f0f0);
+  --text: var(--figma-color-text, #1e1e1e);
+  --text-secondary: var(--figma-color-text-secondary, #6e6e6e);
+  --text-disabled: var(--figma-color-text-disabled, #b3b3b3);
+  --border: var(--figma-color-border, #e6e6e6);
+  --border-strong: var(--figma-color-border-strong, #cccccc);
+  --brand: var(--figma-color-bg-brand, #0d99ff);
+  --brand-text: var(--figma-color-text-onbrand, #ffffff);
+  --success: var(--figma-color-bg-success, #14ae5c);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; height: 100%; }
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.hidden { display: none !important; }
+
+/* ---------- Panel ---------- */
+.panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.panel-header {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.header-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.header-sub {
+  margin-top: 4px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+/* ---------- Buttons ---------- */
+.btn {
+  font: inherit;
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  border: 1px solid var(--border-strong);
+  background: var(--bg);
+  color: var(--text);
+}
+.btn:hover { background: var(--bg-hover); }
+.btn-primary {
+  background: var(--brand);
+  color: var(--brand-text);
+  border-color: var(--brand);
+}
+.btn-primary:hover { filter: brightness(1.05); }
+.btn-secondary { background: var(--bg-secondary); }
+.btn-block { width: 100%; padding: 10px 12px; font-weight: 600; }
+.link-btn {
+  background: none; border: none;
+  color: var(--brand);
+  cursor: pointer; padding: 0; font: inherit;
+}
+.link-btn:hover { text-decoration: underline; }
+
+.checkbox-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.select-label {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.select-label select {
+  font: inherit;
+  padding: 4px 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* ---------- States ---------- */
+.state {
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+/* ---------- Copy panel ---------- */
+.copy-section { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.search-row {
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+.search-row input {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+.frame-list {
+  flex: 1;
+  overflow: auto;
+  padding: 4px 0;
+}
+.frame-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  padding: 8px 12px;
+  cursor: pointer;
+  color: var(--text);
+  font: inherit;
+  border-bottom: 1px solid var(--border);
+}
+.frame-item:hover { background: var(--bg-hover); }
+.frame-item[aria-selected="true"] {
+  background: var(--bg-tertiary);
+  font-weight: 600;
+}
+
+.warning {
+  margin-top: 8px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: rgba(245, 166, 35, 0.15);
+  color: var(--text);
+  font-size: 11px;
+}
+
+.bulk-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+  gap: 8px;
+}
+
+.table-wrap { flex: 1; overflow: auto; padding: 0; }
+.count-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.count-table th,
+.count-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: middle;
+}
+.count-table th {
+  font-weight: 600;
+  background: var(--bg);
+  position: sticky;
+  top: 0;
+  color: var(--text-secondary);
+}
+.col-check { width: 24px; }
+.col-raw, .col-rounded { width: 44px; text-align: right; font-variant-numeric: tabular-nums; }
+.count-table td.col-raw,
+.count-table td.col-rounded { text-align: right; font-variant-numeric: tabular-nums; }
+.col-mode { width: 130px; }
+.count-table select {
+  width: 100%;
+  padding: 2px 4px;
+  font: inherit;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  background: var(--bg);
+  color: var(--text);
+}
+.cell-label {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.format-row {
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+
+.preview-wrap {
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+}
+.preview-label {
+  display: block;
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+.preview {
+  width: 100%;
+  min-height: 80px;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  padding: 6px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  color: var(--text);
+}
+
+.copy-actions {
+  padding: 8px 12px 12px;
+  border-top: 1px solid var(--border);
+}
+
+/* ---------- Toast ---------- */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  background: var(--text);
+  color: var(--bg);
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 11px;
+  z-index: 100;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+</style>
+</head>
+<body>
+  <div class="app">
+    <section class="panel" id="panel-copy">
+      <!-- Frame picker -->
+      <div class="copy-section" id="frame-picker">
+        <header class="panel-header">
+          <h1 class="header-title">Choose a frame to count.</h1>
+        </header>
+        <div class="search-row">
+          <input type="search" id="frame-search" placeholder="Search frames…" />
+          <button class="btn btn-secondary" id="use-selection-btn">Use current selection</button>
+        </div>
+        <div class="frame-list" id="frame-list" role="listbox" aria-label="Top-level frames"></div>
+        <div class="state state-empty hidden" id="no-frames-state">
+          <p>This page has no top-level frames.</p>
+        </div>
+      </div>
+
+      <!-- Frame chosen -->
+      <div class="copy-section hidden" id="frame-chosen">
+        <header class="panel-header">
+          <div class="header-row">
+            <h1 class="header-title" id="chosen-frame-name">Frame</h1>
+            <button class="link-btn" id="change-frame-btn">Change frame</button>
+          </div>
+          <div class="header-sub" id="chosen-frame-sub">0 text layers</div>
+          <div class="warning hidden" id="frame-warning"></div>
+        </header>
+
+        <div class="bulk-controls">
+          <label class="select-label">Set all rows to
+            <select id="bulk-rounding">
+              <option value="none">None</option>
+              <option value="down5">Round down to nearest 5</option>
+              <option value="up5">Round up to nearest 5</option>
+            </select>
+          </label>
+          <label class="checkbox-inline">
+            <input type="checkbox" id="bulk-select-all" checked />
+            <span>Select all</span>
+          </label>
+        </div>
+
+        <div class="table-wrap" id="table-wrap">
+          <table class="count-table" id="count-table">
+            <thead>
+              <tr>
+                <th class="col-check"></th>
+                <th class="col-label">Layer</th>
+                <th class="col-raw">Raw</th>
+                <th class="col-rounded">Rounded</th>
+                <th class="col-mode">Mode</th>
+              </tr>
+            </thead>
+            <tbody id="count-tbody"></tbody>
+          </table>
+          <div class="state state-empty hidden" id="no-text-state">
+            <p>This frame has no text layers.</p>
+          </div>
+        </div>
+
+        <div class="format-row">
+          <label class="select-label">Format
+            <select id="format-select">
+              <option value="plain">Plain list</option>
+              <option value="markdown">Markdown bullets</option>
+              <option value="keyvalue">key: value</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="preview-wrap">
+          <label for="preview-area" class="preview-label">Preview</label>
+          <textarea readonly id="preview-area" class="preview"></textarea>
+        </div>
+
+        <div class="copy-actions">
+          <button class="btn btn-primary btn-block" id="copy-now-btn">Copy now</button>
+        </div>
+      </div>
+    </section>
+
+    <div class="toast hidden" id="toast" role="status" aria-live="polite"></div>
+  </div>
+
+<script>"use strict";
+(() => {
+  // src/count/format.ts
+  function applyRounding(count, mode) {
+    if (mode === "down5") return Math.floor(count / 5) * 5;
+    if (mode === "up5") return Math.ceil(count / 5) * 5;
+    return count;
+  }
+  function buildPreview(rows, format) {
+    const selected = rows.filter((r) => r.selected);
+    if (selected.length === 0) return "";
+    const labelCounts = /* @__PURE__ */ new Map();
+    for (const r of selected) {
+      labelCounts.set(r.item.label, (labelCounts.get(r.item.label) || 0) + 1);
+    }
+    const lines = [];
+    for (const r of selected) {
+      const rounded = applyRounding(r.item.charCount, r.rounding);
+      let label = r.item.label;
+      if ((labelCounts.get(label) || 0) > 1) {
+        const snippet = r.item.text.trim().slice(0, 24);
+        if (snippet && snippet !== label) label = `${label} (${snippet})`;
+      }
+      lines.push(formatLine(label, rounded, format));
+    }
+    return lines.join("\n");
+  }
+  function formatLine(label, count, format) {
+    switch (format) {
+      case "markdown":
+        return `- ${label}: ${count} chars`;
+      case "keyvalue":
+        return `${label}: ${count}`;
+      case "plain":
+      default:
+        return `${label}: ${count} chars`;
+    }
+  }
+
+  // src/ui.ts
+  function send(msg) {
+    parent.postMessage({ pluginMessage: msg }, "*");
+  }
+  var copy = {
+    frames: [],
+    search: "",
+    chosenFrameId: null,
+    chosenFrameName: "",
+    items: [],
+    rowState: /* @__PURE__ */ new Map(),
+    format: "plain",
+    warning: null
+  };
+  document.addEventListener("DOMContentLoaded", () => {
+    wireCopy();
+    send({ type: "list-frames" });
+  });
+  window.onmessage = (event) => {
+    const msg = event.data && event.data.pluginMessage;
+    if (!msg) return;
+    switch (msg.type) {
+      case "frames":
+        onFrames(msg.frames);
+        return;
+      case "count-result":
+        onCountResult(msg.frameId, msg.frameName, msg.items);
+        return;
+    }
+  };
+  function wireCopy() {
+    byId("frame-search").addEventListener("input", (e) => {
+      copy.search = e.target.value.toLowerCase();
+      renderFrameList();
+    });
+    byId("use-selection-btn").addEventListener("click", () => {
+      send({ type: "list-frames" });
+    });
+    byId("change-frame-btn").addEventListener("click", () => {
+      copy.chosenFrameId = null;
+      copy.items = [];
+      copy.rowState.clear();
+      copy.warning = null;
+      show("frame-picker");
+      hide("frame-chosen");
+      send({ type: "list-frames" });
+    });
+    byId("bulk-rounding").addEventListener("change", (e) => {
+      const mode = e.target.value;
+      for (const item of copy.items) {
+        const st = copy.rowState.get(item.nodeId);
+        if (st) st.rounding = mode;
+      }
+      renderCountTable();
+      renderPreview();
+    });
+    byId("bulk-select-all").addEventListener("change", (e) => {
+      const checked = e.target.checked;
+      for (const item of copy.items) {
+        const st = copy.rowState.get(item.nodeId);
+        if (st) st.selected = checked;
+      }
+      renderCountTable();
+      renderPreview();
+    });
+    byId("format-select").addEventListener("change", (e) => {
+      copy.format = e.target.value;
+      renderPreview();
+    });
+    byId("copy-now-btn").addEventListener("click", onCopyNow);
+  }
+  function onFrames(frames) {
+    copy.frames = frames;
+    if (copy.chosenFrameId) {
+      const stillThere = frames.find((f) => f.id === copy.chosenFrameId);
+      if (!stillThere) {
+        copy.warning = "The chosen frame was deleted. Pick another.";
+        showFrameWarning();
+      } else if (stillThere.name !== copy.chosenFrameName) {
+        copy.chosenFrameName = stillThere.name;
+        setText("chosen-frame-name", stillThere.name);
+      }
+    }
+    if (copy.chosenFrameId === null) {
+      show("frame-picker");
+      hide("frame-chosen");
+    }
+    renderFrameList();
+  }
+  function renderFrameList() {
+    const list = byId("frame-list");
+    list.innerHTML = "";
+    const filtered = copy.frames.filter(
+      (f) => !copy.search || f.name.toLowerCase().includes(copy.search)
+    );
+    if (copy.frames.length === 0) {
+      show("no-frames-state");
+      return;
+    }
+    hide("no-frames-state");
+    for (const f of filtered) {
+      const btn = document.createElement("button");
+      btn.className = "frame-item";
+      btn.textContent = f.name;
+      btn.addEventListener("click", () => pickFrame(f.id, f.name));
+      list.appendChild(btn);
+    }
+  }
+  function pickFrame(id, name) {
+    copy.chosenFrameId = id;
+    copy.chosenFrameName = name;
+    copy.warning = null;
+    setText("chosen-frame-name", name);
+    setText("chosen-frame-sub", "Loading text layers\u2026");
+    hide("frame-picker");
+    show("frame-chosen");
+    send({ type: "count-frame", frameId: id });
+  }
+  function onCountResult(frameId, frameName, items) {
+    if (copy.chosenFrameId !== frameId) {
+      return;
+    }
+    copy.chosenFrameName = frameName || copy.chosenFrameName;
+    setText("chosen-frame-name", copy.chosenFrameName);
+    copy.items = items;
+    copy.rowState.clear();
+    for (const item of items) {
+      copy.rowState.set(item.nodeId, { selected: true, rounding: "none" });
+    }
+    setText(
+      "chosen-frame-sub",
+      `${items.length} text layer${items.length === 1 ? "" : "s"}`
+    );
+    byId("bulk-select-all").checked = true;
+    byId("bulk-rounding").value = "none";
+    renderCountTable();
+    renderPreview();
+  }
+  function renderCountTable() {
+    const tbody = byId("count-tbody");
+    tbody.innerHTML = "";
+    if (copy.items.length === 0) {
+      hide("count-table");
+      show("no-text-state");
+      return;
+    }
+    show("count-table");
+    hide("no-text-state");
+    for (const item of copy.items) {
+      const st = copy.rowState.get(item.nodeId);
+      if (!st) continue;
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+      <td class="col-check"><input type="checkbox" data-id="${escapeAttr(item.nodeId)}" ${st.selected ? "checked" : ""} /></td>
+      <td class="cell-label" title="${escapeAttr(item.label)}
+${escapeAttr(item.text)}">${escapeHtml(item.label)}</td>
+      <td class="col-raw">${item.charCount}</td>
+      <td class="col-rounded">${applyRoundingClient(item.charCount, st.rounding)}</td>
+      <td class="col-mode">
+        <select data-id="${escapeAttr(item.nodeId)}">
+          <option value="none" ${st.rounding === "none" ? "selected" : ""}>None</option>
+          <option value="down5" ${st.rounding === "down5" ? "selected" : ""}>Round down to nearest 5</option>
+          <option value="up5" ${st.rounding === "up5" ? "selected" : ""}>Round up to nearest 5</option>
+        </select>
+      </td>
+    `;
+      tbody.appendChild(tr);
+    }
+    tbody.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
+      cb.addEventListener("change", () => {
+        const id = cb.getAttribute("data-id") || "";
+        const st = copy.rowState.get(id);
+        if (st) st.selected = cb.checked;
+        syncBulkSelectAll();
+        renderPreview();
+      });
+    });
+    tbody.querySelectorAll("select").forEach((sel) => {
+      sel.addEventListener("change", () => {
+        const id = sel.getAttribute("data-id") || "";
+        const st = copy.rowState.get(id);
+        if (st) st.rounding = sel.value;
+        renderCountTable();
+        renderPreview();
+      });
+    });
+  }
+  function applyRoundingClient(count, mode) {
+    if (mode === "down5") return Math.floor(count / 5) * 5;
+    if (mode === "up5") return Math.ceil(count / 5) * 5;
+    return count;
+  }
+  function syncBulkSelectAll() {
+    const cb = byId("bulk-select-all");
+    const allSelected = copy.items.every((item) => {
+      var _a;
+      return (_a = copy.rowState.get(item.nodeId)) == null ? void 0 : _a.selected;
+    });
+    cb.checked = allSelected;
+  }
+  function renderPreview() {
+    const rows = copy.items.map((item) => {
+      const st = copy.rowState.get(item.nodeId) || { selected: true, rounding: "none" };
+      return { item, selected: st.selected, rounding: st.rounding };
+    });
+    const text = buildPreview(rows, copy.format);
+    byId("preview-area").value = text;
+  }
+  function showFrameWarning() {
+    const el = byId("frame-warning");
+    if (!copy.warning) {
+      el.classList.add("hidden");
+      el.textContent = "";
+      return;
+    }
+    el.classList.remove("hidden");
+    el.textContent = copy.warning;
+  }
+  async function onCopyNow() {
+    const ta = byId("preview-area");
+    const text = ta.value;
+    if (!text) {
+      toast("Nothing to copy \u2014 select at least one row.");
+      return;
+    }
+    const lines = text.split("\n").length;
+    const btn = byId("copy-now-btn");
+    const originalLabel = btn.textContent;
+    try {
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+        await navigator.clipboard.writeText(text);
+      } else {
+        throw new Error("no-clipboard-api");
+      }
+      btn.textContent = "Copied \u2713";
+      toast(`Copied ${lines} line${lines === 1 ? "" : "s"} to clipboard`);
+      setTimeout(() => {
+        btn.textContent = originalLabel || "Copy now";
+      }, 1500);
+    } catch (e) {
+      try {
+        ta.focus();
+        ta.select();
+        const ok = document.execCommand && document.execCommand("copy");
+        if (ok) {
+          btn.textContent = "Copied \u2713";
+          toast(`Copied ${lines} line${lines === 1 ? "" : "s"} to clipboard`);
+          setTimeout(() => {
+            btn.textContent = originalLabel || "Copy now";
+          }, 1500);
+        } else {
+          throw new Error("exec-failed");
+        }
+      } catch (e2) {
+        ta.focus();
+        ta.select();
+        toast("Couldn't copy automatically \u2014 preview is selected, press \u2318C.");
+      }
+    }
+  }
+  function byId(id) {
+    const el = document.getElementById(id);
+    if (!el) throw new Error(`Missing element: ${id}`);
+    return el;
+  }
+  function setText(id, text) {
+    byId(id).textContent = text;
+  }
+  function show(id) {
+    byId(id).classList.remove("hidden");
+  }
+  function hide(id) {
+    byId(id).classList.add("hidden");
+  }
+  function escapeHtml(s) {
+    return s.replace(
+      /[&<>"]/g,
+      (c) => c === "&" ? "&amp;" : c === "<" ? "&lt;" : c === ">" ? "&gt;" : "&quot;"
+    );
+  }
+  function escapeAttr(s) {
+    return escapeHtml(s).replace(/\n/g, " ");
+  }
+  var toastTimer;
+  function toast(message) {
+    const el = byId("toast");
+    el.textContent = message;
+    el.classList.remove("hidden");
+    if (toastTimer) window.clearTimeout(toastTimer);
+    toastTimer = window.setTimeout(() => {
+      el.classList.add("hidden");
+    }, 2200);
+  }
+})();
+</script>
+</body>
+</html>
