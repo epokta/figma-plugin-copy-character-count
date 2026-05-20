@@ -240,21 +240,35 @@ body {
 }
 
 /* ---------- Form controls ---------- */
-.select-compact {
+/* Unified select style — every dropdown in the panel (headline selects in the
+   card heads AND the per-row Mode selects inside the table) shares the same
+   height, padding pattern, and chevron breathing room. Width is `auto` so each
+   select hugs its current option's length instead of stretching to fill the
+   row. */
+.select-compact,
+.count-table .col-mode select {
   font: inherit;
   font-size: 12px;
-  /* 8px top/bottom and 14px on the right so the native dropdown chevron has
-     at least 8px of breathing room on every side. */
-  padding: 8px 30px 8px 12px;
+  height: 32px;
+  /* Right padding gives the native dropdown chevron at least 8px on every
+     side. Left padding keeps text from hugging the border. */
+  padding: 0 36px 0 14px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
   background: var(--bg-card);
   color: var(--text);
   cursor: pointer;
-  min-width: 120px;
+  width: auto;
+  /* Don't go narrower than this — keeps "None" / "Up 5" readable. */
+  min-width: 96px;
 }
-.select-compact:hover { background: var(--bg-hover); }
-.select-compact:focus { outline: 2px solid var(--brand); outline-offset: -1px; }
+.select-compact:hover,
+.count-table .col-mode select:hover { background: var(--bg-hover); }
+.select-compact:focus,
+.count-table .col-mode select:focus {
+  outline: 2px solid var(--brand);
+  outline-offset: -1px;
+}
 
 .checkbox-inline {
   display: inline-flex;
@@ -338,19 +352,7 @@ body {
 .count-table td.col-raw,
 .count-table td.col-rounded { text-align: right; font-variant-numeric: tabular-nums; }
 .col-mode { width: 116px; }
-.count-table .col-mode select {
-  width: 100%;
-  font: inherit;
-  font-size: 11px;
-  /* Match the larger selects: at least 8px around the dropdown chevron. */
-  padding: 6px 24px 6px 10px;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  background: var(--bg-card);
-  color: var(--text);
-  cursor: pointer;
-}
-.count-table .col-mode select:hover { background: var(--bg-hover); }
+/* Overrides for the in-table Mode select live with the unified rule above. */
 .col-label { min-width: 0; }
 .cell-label {
   overflow: hidden;
