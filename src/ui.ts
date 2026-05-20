@@ -195,10 +195,10 @@ function renderCountTable() {
       <td class="col-raw">${item.charCount}</td>
       <td class="col-rounded">${applyRoundingClient(item.charCount, st.rounding)}</td>
       <td class="col-mode">
-        <select data-id="${escapeAttr(item.nodeId)}">
+        <select data-id="${escapeAttr(item.nodeId)}" title="Rounding mode">
           <option value="none" ${st.rounding === 'none' ? 'selected' : ''}>None</option>
-          <option value="down5" ${st.rounding === 'down5' ? 'selected' : ''}>Round down to nearest 5</option>
-          <option value="up5" ${st.rounding === 'up5' ? 'selected' : ''}>Round up to nearest 5</option>
+          <option value="down5" ${st.rounding === 'down5' ? 'selected' : ''}>Down 5</option>
+          <option value="up5" ${st.rounding === 'up5' ? 'selected' : ''}>Up 5</option>
         </select>
       </td>
     `;

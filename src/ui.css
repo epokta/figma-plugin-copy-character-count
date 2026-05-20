@@ -112,7 +112,7 @@ body {
 }
 .split-right {
   flex: 3 1 0;
-  min-width: 280px;
+  min-width: 320px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -265,7 +265,7 @@ body {
   font-size: 12px;
 }
 .count-table th {
-  padding: 10px 16px 8px;
+  padding: 10px 6px 8px;
   font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
@@ -276,39 +276,47 @@ body {
   position: sticky;
   top: 0;
   border-bottom: 1px solid var(--border);
+  white-space: nowrap;
 }
 .count-table td {
-  padding: 9px 16px;
+  padding: 9px 6px;
   vertical-align: middle;
   color: var(--text);
 }
+.count-table th:first-child,
+.count-table td:first-child { padding-left: 14px; }
+.count-table th:last-child,
+.count-table td:last-child { padding-right: 14px; }
 .count-table tbody tr + tr td { border-top: 1px solid var(--border); }
 .count-table tbody tr:hover td { background: var(--bg-hover); }
 
-.col-check { width: 32px; padding-right: 8px !important; }
+.col-check { width: 28px; }
 .col-check input[type="checkbox"] { width: 14px; height: 14px; cursor: pointer; }
-.col-raw, .col-rounded { width: 52px; text-align: right; font-variant-numeric: tabular-nums; }
+.col-raw { width: 40px; text-align: right; font-variant-numeric: tabular-nums; }
+.col-rounded { width: 48px; text-align: right; font-variant-numeric: tabular-nums; }
 .count-table td.col-raw { color: var(--text-secondary); }
 .count-table td.col-rounded { font-weight: 500; }
 .count-table td.col-raw,
 .count-table td.col-rounded { text-align: right; font-variant-numeric: tabular-nums; }
-.col-mode { width: 140px; }
+.col-mode { width: 80px; }
 .count-table .col-mode select {
   width: 100%;
   font: inherit;
   font-size: 11px;
-  padding: 4px 8px;
+  padding: 4px 6px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--bg-card);
   color: var(--text);
+  text-overflow: ellipsis;
 }
 .count-table .col-mode select:hover { background: var(--bg-hover); }
+.col-label { min-width: 0; }
 .cell-label {
-  max-width: 220px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  max-width: 100%;
 }
 
 .state-empty {
