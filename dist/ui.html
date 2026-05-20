@@ -41,9 +41,10 @@ body {
 .app {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100vh;
   padding: 20px;
   gap: 16px;
+  overflow: hidden;
 }
 
 .hidden { display: none !important; }
@@ -54,9 +55,20 @@ body {
   flex-direction: column;
   gap: 16px;
   flex: 1;
+  min-height: 0;
 }
 
-.copy-section { display: contents; }
+.copy-section {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 16px;
+}
+#no-selection-state {
+  /* The empty state just shows a single card and shouldn't stretch. */
+  flex: 0 0 auto;
+}
 
 /* ---------- Empty state ---------- */
 .empty {
@@ -107,14 +119,15 @@ body {
 .split-layout {
   display: flex;
   gap: 16px;
-  align-items: flex-start;
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
 }
 .split-left {
   flex: 7 1 0;
   min-width: 0;
-  position: sticky;
-  top: 20px;
-  align-self: flex-start;
+  overflow-y: auto;
+  max-height: 100%;
 }
 .split-right {
   flex: 3 1 0;
@@ -122,19 +135,27 @@ body {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  max-height: 100%;
+  min-height: 0;
 }
 @media (max-width: 640px) {
-  .split-layout { flex-direction: column; }
+  .app { height: auto; overflow: visible; }
+  .copy-section { flex: 0 0 auto; }
+  .split-layout { flex-direction: column; flex: 0 0 auto; min-height: 0; }
   .split-left {
     flex: 0 0 auto;
     width: 100%;
-    position: static;
+    max-height: none;
+    overflow-y: visible;
   }
   .split-right {
     flex: 0 0 auto;
     width: 100%;
     min-width: 0;
+    max-height: none;
   }
+  .card-flex { flex: 0 0 auto; }
+  .card-flex .table-wrap { max-height: 400px; }
 }
 
 /* ---------- Preview card ---------- */
@@ -176,6 +197,21 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   overflow: hidden;
+}
+/* Flexible card that fills remaining vertical space and lets its table scroll
+   internally. Used by the TEXT LAYERS card so the OUTPUT card below it stays
+   pinned and always visible. */
+.card-flex {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.card-flex .card-head { flex: 0 0 auto; }
+.card-flex .card-row { flex: 0 0 auto; }
+.card-flex .table-wrap {
+  flex: 1 1 0;
+  min-height: 0;
 }
 .card-head {
   display: flex;
@@ -262,12 +298,13 @@ body {
 
 /* ---------- Table ---------- */
 .table-wrap {
-  overflow: auto;
-  max-height: 380px;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 .count-table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
   font-size: 12px;
 }
 .count-table th {
@@ -420,7 +457,7 @@ body {
 
           <div class="split-right">
 
-            <div class="card">
+            <div class="card card-flex">
               <div class="card-head">
                 <span class="card-label">Text layers</span>
                 <label class="checkbox-inline">
