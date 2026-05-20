@@ -12,78 +12,85 @@
 
       <!-- Empty state: no frame selected in the canvas -->
       <div class="copy-section" id="no-selection-state">
-        <header class="panel-header">
-          <h1 class="header-title">Select a frame</h1>
-          <div class="header-sub">Click a frame in the canvas to count its text layers. The panel updates automatically as your selection changes.</div>
-        </header>
+        <div class="empty">
+          <h1 class="empty-title">Select a frame</h1>
+          <p class="empty-sub">Click a frame in the canvas to count its text layers. The panel updates automatically as your selection changes.</p>
+        </div>
       </div>
 
       <!-- Frame selected -->
       <div class="copy-section hidden" id="frame-chosen">
-        <header class="panel-header">
-          <h1 class="header-title" id="chosen-frame-name">Frame</h1>
-          <div class="header-sub" id="chosen-frame-sub">0 text layers</div>
+        <header class="frame-header">
+          <h1 class="frame-title" id="chosen-frame-name">Frame</h1>
+          <div class="frame-meta" id="chosen-frame-sub">0 text layers</div>
           <div class="warning hidden" id="frame-warning"></div>
         </header>
 
         <div class="split-layout">
           <div class="split-left">
-            <div class="frame-preview-wrap">
+            <div class="preview-card">
               <img id="frame-preview-img" class="frame-preview hidden" alt="Selected frame preview" />
+              <div class="preview-placeholder" id="frame-preview-placeholder"></div>
             </div>
           </div>
 
           <div class="split-right">
-            <div class="bulk-controls">
-              <label class="select-label">Set all rows to
-                <select id="bulk-rounding">
+
+            <div class="card">
+              <div class="card-head">
+                <span class="card-label">Text layers</span>
+                <label class="checkbox-inline">
+                  <input type="checkbox" id="bulk-select-all" checked />
+                  <span>Select all</span>
+                </label>
+              </div>
+              <div class="card-row card-row-bordered">
+                <span class="row-label">Set all rows to</span>
+                <select id="bulk-rounding" class="select-compact">
                   <option value="none">None</option>
                   <option value="down5">Round down to nearest 5</option>
                   <option value="up5">Round up to nearest 5</option>
                 </select>
-              </label>
-              <label class="checkbox-inline">
-                <input type="checkbox" id="bulk-select-all" checked />
-                <span>Select all</span>
-              </label>
-            </div>
-
-            <div class="table-wrap" id="table-wrap">
-              <table class="count-table" id="count-table">
-                <thead>
-                  <tr>
-                    <th class="col-check"></th>
-                    <th class="col-label">Text</th>
-                    <th class="col-raw">Raw</th>
-                    <th class="col-rounded">Rounded</th>
-                    <th class="col-mode">Mode</th>
-                  </tr>
-                </thead>
-                <tbody id="count-tbody"></tbody>
-              </table>
-              <div class="state state-empty hidden" id="no-text-state">
-                <p>This frame has no text layers.</p>
+              </div>
+              <div class="table-wrap" id="table-wrap">
+                <table class="count-table" id="count-table">
+                  <thead>
+                    <tr>
+                      <th class="col-check"></th>
+                      <th class="col-label">Text</th>
+                      <th class="col-raw">Raw</th>
+                      <th class="col-rounded">Rounded</th>
+                      <th class="col-mode">Mode</th>
+                    </tr>
+                  </thead>
+                  <tbody id="count-tbody"></tbody>
+                </table>
+                <div class="state state-empty hidden" id="no-text-state">
+                  <p>This frame has no text layers.</p>
+                </div>
               </div>
             </div>
 
-            <div class="format-row">
-              <label class="select-label">Format
-                <select id="format-select">
+            <div class="card">
+              <div class="card-head">
+                <span class="card-label">Output</span>
+              </div>
+              <div class="card-row">
+                <span class="row-label">Format</span>
+                <select id="format-select" class="select-compact">
                   <option value="plain">Plain list</option>
                   <option value="markdown">Markdown bullets</option>
                   <option value="keyvalue">key: value</option>
                 </select>
-              </label>
+              </div>
+              <div class="card-body">
+                <textarea readonly id="preview-area" class="preview"></textarea>
+              </div>
+              <div class="card-footer">
+                <button class="btn btn-primary btn-block" id="copy-now-btn">Copy now</button>
+              </div>
             </div>
 
-            <div class="preview-wrap">
-              <label for="preview-area" class="preview-label">Preview</label>
-              <textarea readonly id="preview-area" class="preview"></textarea>
-            </div>
-
-            <div class="copy-actions">
-              <button class="btn btn-primary btn-block" id="copy-now-btn">Copy now</button>
-            </div>
           </div>
         </div>
       </div>
