@@ -57,7 +57,7 @@
   var MAX_W = 1200;
   var MAX_H = 1400;
   var SELECTION_DEBOUNCE_MS = 150;
-  figma.showUI(__html__, { width: 360, height: 560, themeColors: true });
+  figma.showUI(__html__, { width: 640, height: 600, themeColors: true });
   figma.ui.onmessage = async (msg) => {
     if (!msg || typeof msg !== "object") return;
     switch (msg.type) {

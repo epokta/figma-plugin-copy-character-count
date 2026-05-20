@@ -21,7 +21,7 @@ const SELECTION_DEBOUNCE_MS = 150;
 // ---------------------------------------------------------------------------
 // Bootstrap
 
-figma.showUI(__html__, { width: 360, height: 560, themeColors: true });
+figma.showUI(__html__, { width: 640, height: 600, themeColors: true });
 
 figma.ui.onmessage = async (msg: UiToMainMessage) => {
   if (!msg || typeof msg !== 'object') return;
