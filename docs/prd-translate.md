@@ -2,14 +2,16 @@
 
 **Plugin:** Copy character count
 **Author:** Emilia
-**Status:** Draft
+**Status:** Draft (v2 — simplified to output-only translation)
 **Last updated:** 2026-05-12
 
 ## 1. Summary
 
-Add a Translate panel to the plugin that takes the same text layers we already extract from a selected frame and produces translations into German, Arabic, or Spanish. The translation runs through a hosted translation API, results live next to each row in the existing table, and the user can copy the translated set in the same plain / Markdown / `key: value` formats already supported.
+Add a **Translate** action inside the existing Output card. The user picks a target language (German, Arabic, Spanish) and hits **Translate** — the plugin sends the strings to a hosted translation API and the Output preview re-renders with translated text and **translated character counts**. The user clicks **Copy now** as usual.
 
-The plugin stays read-only — it does not edit the Figma document. Translations are a paste-out, not an in-place rewrite.
+The Text Layers table is untouched. It always shows the originals — those are the source of truth. The Output card is where translation happens, because that's what gets pasted into spec docs, tickets, and strings files.
+
+The plugin stays read-only — it does not edit the Figma document.
 
 ## 2. Problem
 
@@ -17,111 +19,124 @@ Designers working on multi-locale products today have to:
 
 1. Hand-copy each text layer one at a time out of Figma.
 2. Paste each string into a separate translation tool.
-3. Paste each translation into a spec sheet for the localization team.
+3. Manually count translated character lengths to spot truncation risk (German is ~30% longer than English; Arabic flips RTL with its own line-break rules).
+4. Paste the result into a spec sheet for the localization team.
 
-This is a flow that costs an hour or two per screen and is bug-prone — strings get missed, character counts get miscounted (German is on average 30% longer than English; Arabic and Hebrew flip RTL), and the resulting handoff doc drifts out of sync with the design as it changes.
-
-The current plugin already solves the "list all text layers with their character counts" half of this flow. Adding translation closes the loop.
+The plugin already solves the first half — extracting the text and counting characters. Adding a Translate button to the Output card closes the loop *without* cluttering the table or changing the source-of-truth view.
 
 ## 3. Goals
 
-- **G1** — From a selected frame, produce translations of every text layer into German (de), Arabic (ar), and Spanish (es) with a one-click target-language switch.
-- **G2** — Show translated character counts alongside originals so designers can spot length problems (truncation risk in German, line-break risk in Arabic) before sending the design to localization.
-- **G3** — Let the user copy the translated set in the existing output formats (plain list / Markdown bullets / `key: value`) plus a new "Original → Translation" two-column format.
-- **G4** — Keep the plugin read-only. No in-place text mutation in v1.
+- **G1** — From the current Output preview, produce a translated version in German, Arabic, or Spanish with one click.
+- **G2** — Show translated character counts in the output so the designer can spot length issues (German overflow, Arabic line-break) before sending the design to localization.
+- **G3** — Preserve the existing Output formats (plain list / Markdown bullets / `key: value`) when translation is on.
+- **G4** — Keep the Text Layers table unchanged. Originals stay visible as the source of truth.
+- **G5** — Keep the plugin read-only. No in-place text mutation in v1.
 
 ## 4. Non-goals
 
-- **NG1** — In-place translation of the Figma document (replacing the canvas text). Considered for v2.
-- **NG2** — Translation quality review tooling (the plugin reports what the API returns; it doesn't flag awkward translations).
-- **NG3** — More than the three languages above for v1. Adding more is mechanical but each adds review and testing surface.
-- **NG4** — Translation memory / glossary management. Out of scope for v1; future work.
-- **NG5** — Offline / on-device translation. Requires bundling a model; cost/size tradeoff not worth it for v1.
+- **NG1** — Adding columns to the Text Layers table. Translation lives in the Output card only.
+- **NG2** — In-place translation of the Figma document. Considered for v2 behind a confirmation modal.
+- **NG3** — Translation quality review tooling. Plugin reports what the API returns.
+- **NG4** — More than three languages in v1.
+- **NG5** — Translation memory / glossary management.
+- **NG6** — Offline / on-device translation.
 
 ## 5. User stories
 
-- **US1** — *Designer at a travel app:* I'm shipping a Benefits screen in EN, DE, AR, ES. I want to see all 65 text strings on screen with their translations and rounded character counts so I can flag the headlines that will overflow in German.
-- **US2** — *Content designer:* I want to paste a Markdown list of `English → Spanish` strings into a Linear ticket so the localization team can review my proposed copy alongside the source.
-- **US3** — *PM / reviewer:* I want a "key: value" output of `key → translated` to drop into a strings file for the engineers to wire up.
+- **US1** — *Designer at a travel app:* I have a Benefits screen with 65 strings. I want to click Translate → German, see translated lengths in the Output preview, and immediately spot which headlines overflow.
+- **US2** — *Content designer:* I want a Markdown list of translated strings to drop into a Linear ticket so the localization team sees my proposed copy in Spanish, not in English.
+- **US3** — *PM:* I want a `key: value` output of the translated set to paste into a strings file for the engineers to wire up.
 
 ## 6. Functional requirements
 
-### 6.1 Language switcher
+### 6.1 Translate row in the Output card
 
-A new control row at the top of the Text Layers card, between the existing "Set all rows to" row and the table.
-
-- A select labeled **Translate to** with four options:
-  - `Off` (default, current behavior — no translation columns)
-  - `German (de)`
-  - `Arabic (ar)`
-  - `Spanish (es)`
-- When the user picks a non-Off option, the plugin requests translations for every text layer in the current frame and re-renders the table with two extra columns (see 6.2).
-
-### 6.2 Table columns
-
-When translation is on, the table grows to:
-
-| ☐ | Text (original) | Raw | Round | Translation | T. Raw | T. Round | Mode |
-
-- **Translation** — translated string, truncates with ellipsis like the original Text column. Hovering reveals the full string.
-- **T. Raw** — grapheme-cluster character count of the translation.
-- **T. Round** — the translation's count after applying the row's existing rounding mode.
-
-The original four columns keep their current behavior. Hovering a translated cell shows a tooltip with the full original + full translation so the designer can spot-check.
-
-### 6.3 Output formats
-
-Format dropdown gains a new option **"Original → Translation"**:
+Add a single row to the Output card, between the Format selector and the preview textarea:
 
 ```
-Welcome to Tripguide → Willkommen bei Tripguide  (20 → 22 chars)
-Lounges → Lounges  (7 → 7 chars)
+Translate to  [ German ▾ ]   [ Translate ]   [ Reset ]
 ```
 
-The three existing formats (plain, markdown, keyvalue) also render translations when translation is on:
+- **Language select** — three options: `German (de)`, `Arabic (ar)`, `Spanish (es)`. Defaults to German.
+- **Translate** button — secondary style (matches the existing `Copy now` visual weight but in outline form). Pressing it triggers a translation pass.
+- **Reset** link — only visible when the output is currently showing a translation. Reverts the preview to the original-language output.
 
-- `plain`: `Welcome to Tripguide → Willkommen bei Tripguide: 22 chars`
-- `markdown`: `- Welcome to Tripguide → Willkommen bei Tripguide: 22 chars`
-- `keyvalue`: `Welcome to Tripguide: Willkommen bei Tripguide`
+The Text Layers table above is **not modified** in any way by this feature.
 
-### 6.4 RTL handling (Arabic)
+### 6.2 What the button does
 
-- Translated text in the table is rendered with `dir="auto"` so Arabic strings display right-to-left in the cell.
-- Character counts use the same grapheme-cluster method we use today — combining marks count as one character.
-- The clipboard output is plain text; the receiving app handles RTL rendering. No special escaping.
+When the user clicks **Translate**:
 
-### 6.5 Caching
+1. The plugin collects the set of selected rows (same set the current Output preview is built from).
+2. It sends each row's source string to the translation provider (batched into one or two API calls — see §8.5).
+3. As translations resolve, the Output preview re-renders with the translated strings substituted for the originals.
+4. **Character counts in the preview are now the translated string's grapheme count**, not the original's. The rounding mode applied to each row still applies, but to the translated count.
 
-Translations are cached in plugin memory keyed by `(source_text + target_lang)`. Re-selecting the same frame or switching the rounding mode does not re-trigger an API call. Cache is cleared when the panel is closed.
+A status row appears in place of Reset while in flight: `Translating 65 strings…` with a tiny pulse indicator.
 
-### 6.6 Error states
+### 6.3 Output formats with translation on
 
-- **No API key configured** → empty state in the Translate column saying "Set your translation key in Settings to enable translation."
-- **API error (rate limit, network failure, invalid key)** → the affected row shows "—" in the Translation column with a tooltip describing the error. Other rows continue to render. A toast surfaces the underlying error message once.
-- **Empty source string** → translation column shows "—".
+When the preview is in translated state, the four format options render as:
+
+- `plain`: `Willkommen bei Tripguide: 24 chars`
+- `markdown`: `- Willkommen bei Tripguide: 24 chars`
+- `keyvalue`: `Willkommen bei Tripguide: 24`
+- *(no new format added — keeps parity with the originals view)*
+
+### 6.4 State persistence within a session
+
+- The user's last-picked language is remembered for the lifetime of the plugin window.
+- If the user changes the row selection (un-checks rows, picks a different rounding mode, switches format) **while in translated state**, the preview re-builds in the same translated language — no need to click Translate again.
+- If the user changes frames (selects a different frame in Figma), the preview resets to the original-language view. They re-click Translate to re-translate the new frame's strings.
+
+### 6.5 Reset
+
+Clicking **Reset** swaps the preview back to original-language output. The translation cache is preserved — clicking Translate again with the same language is instant (cache hit).
+
+### 6.6 Per-row rounding still applies
+
+Rounding modes the user sets in the table are applied to the translated character count. So a row with `Round up to nearest 5` shows `25` for a translated string of 22 chars in the preview, just like it would for a 22-char original.
+
+### 6.7 RTL handling (Arabic)
+
+- Arabic strings in the preview textarea render right-to-left automatically because the textarea is `dir="auto"`.
+- Character counts use the existing grapheme-cluster method — combining marks count as one character.
+- Clipboard output is plain text; the receiving app handles RTL rendering.
+
+### 6.8 Error states
+
+- **No API key configured** → first click of Translate opens the Settings panel inline with the API key input. No API call happens until a key is saved.
+- **API error on individual strings** → that row appears in the preview as the original source string with a trailing `(translation failed)` note. Other rows render normally. A toast surfaces the underlying provider error.
+- **All translations fail** (e.g. invalid key, network down) → preview stays in original-language state; a banner across the top of the Output card says `Translation failed: <message>`.
+- **Empty source string** → translation column shows the same empty marker the originals view uses (`(empty)`).
 
 ## 7. UX
 
 ### 7.1 Settings entry
 
-Add a small gear icon in the plugin header (top right of the frame title row) opening a Settings panel. Settings contain:
+Add a gear icon in the plugin header (top right of the frame title row) opening a Settings panel. Settings contain:
 
-- **Translation provider** — select (DeepL, Google Cloud Translation, OpenAI) — see §9 for tradeoffs.
-- **API key** — password-style input. Stored via `figma.clientStorage` (encrypted, per-plugin, per-user). Cleared with a "Reset" button.
-- **About** — one line: "Translations run on your API key. The plugin sends each text layer to the provider's API. The provider does not retain the strings beyond what its TOS state."
+- **Translation provider** — select (DeepL recommended; Google Cloud Translation; OpenAI). See §9.
+- **API key** — password-style input. Stored via `figma.clientStorage` (per-plugin, per-user, never written to the manifest).
+- **Reset key** — clears the stored key.
+- **About** — one line: "Translations run on your API key. The plugin sends each text layer to the provider's API. The provider does not retain the strings beyond what its TOS states."
 
-The gear is hidden when no API key is set, replaced by a "Set up translation" link in the empty Translate column.
+The gear icon is hidden until at least one Translate click has happened, to avoid cluttering the header for users who never use translation.
 
 ### 7.2 First-run flow
 
-1. User picks a language from the Translate dropdown.
-2. If no API key is configured, the plugin opens the Settings panel inline with a 2-line explainer and the API key input.
+1. User clicks **Translate**.
+2. If no API key is configured, an inline panel slides over the Output card with: "To translate, set up your translation key. (link to DeepL signup)"
 3. User pastes a key, picks a provider, clicks Save.
-4. Translation begins; rows populate as each call returns.
+4. The Translate button re-fires automatically; the preview populates as each batch returns.
 
-### 7.3 Loading state
+### 7.3 Translated-state badge
 
-Each row's Translation cell shows a thin animated bar (a pulse, not a spinner) while waiting for that string's API response. The user can interact with rows that have already resolved.
+While the preview is in translated state, a small pill appears just above the preview textarea: `Translated to German · Reset`. Click Reset to revert.
+
+### 7.4 Loading state
+
+While the request is in flight, the Translate button shows `Translating…` and is disabled. The preview textarea content goes faintly dimmed (50% opacity) to signal it's about to change. Per-string failures don't fail the whole batch.
 
 ## 8. Technical requirements
 
@@ -133,7 +148,7 @@ Each row's Translation cell shows a thin animated bar (a pulse, not a spinner) w
 "networkAccess": { "allowedDomains": ["none"] }
 ```
 
-Update to allow the chosen provider's API hostnames:
+Update to allow the chosen provider's hostnames:
 
 ```json
 "networkAccess": {
@@ -143,11 +158,11 @@ Update to allow the chosen provider's API hostnames:
     "https://translation.googleapis.com",
     "https://api.openai.com"
   ],
-  "reasoning": "Plugin sends text layer strings to a user-configured translation provider on behalf of the user."
+  "reasoning": "Plugin sends text-layer strings to a user-configured translation provider on behalf of the user when they click Translate."
 }
 ```
 
-The Community review will scrutinize this change. The `reasoning` string is required by Figma and shown to users when they install.
+Figma Community review will scrutinize this. The `reasoning` string is required and shown to users at install time.
 
 ### 8.2 New modules
 
@@ -158,88 +173,107 @@ src/translate/
   google.ts          Google Cloud Translation implementation
   openai.ts          OpenAI implementation (gpt-4o-mini with explicit prompt)
   cache.ts           In-memory cache keyed by (text, lang, provider)
-  settings.ts        Read/write API key via figma.clientStorage
+  settings.ts        Read/write API key + provider via figma.clientStorage
 ```
 
 ### 8.3 New message types
 
 ```ts
 // UI → main
-{ type: 'translate', frameId: string, targetLang: 'de' | 'ar' | 'es' }
+{ type: 'translate', strings: string[], targetLang: 'de' | 'ar' | 'es' }
 { type: 'save-settings', provider: 'deepl' | 'google' | 'openai', apiKey: string }
 { type: 'load-settings' }
 
-// Main → UI
-{ type: 'translations', frameId: string, translations: { nodeId: string; translation: string }[] }
-{ type: 'translation-error', nodeId: string, message: string }
+// Main → main → UI
+{ type: 'translations', translations: { source: string; translation: string }[] }
+{ type: 'translation-error', source: string, message: string }
+{ type: 'translation-batch-error', message: string }
 { type: 'settings', provider: string | null, hasKey: boolean }
 ```
 
 ### 8.4 Where translation runs
 
-Inside `main.ts` (the sandbox). The sandbox owns network access; the UI iframe can't make external requests under Figma's plugin model. UI sends the request, sandbox fetches, sandbox posts results back.
+Inside `main.ts` (the sandbox). The sandbox owns network access; the UI iframe can't make external requests under Figma's plugin model. UI posts the request, sandbox fetches, sandbox posts results back.
 
 ### 8.5 Batching
 
-Send translations in batches of 50 strings per API call where the provider supports it (DeepL and Google both do). For OpenAI we send strings in a single prompt with a JSON array round-trip. This keeps a 65-layer frame to one or two API calls.
+Send translations in batches of 50 strings per API call where the provider supports it (DeepL and Google both do). For OpenAI we send strings as a JSON array in a single prompt with a round-trip schema. A 65-layer frame batched cleanly → one or two API calls.
+
+### 8.6 Substitution into the existing preview pipeline
+
+The existing `buildPreview` function in `src/count/format.ts` takes `PreviewRow[]` and builds the clipboard string. To support translated output, we add an optional `translatedText` field on each PreviewRow:
+
+```ts
+interface PreviewRow {
+  item: TextBoxCount;
+  rounding: RoundingMode;
+  selected: boolean;
+  translatedText?: string;  // when present, used instead of item.text
+}
+```
+
+`buildPreview` uses `translatedText ?? item.text` for the visible string, and computes its character count via the existing `graphemeCount` helper. Rounding still applies to that count.
+
+Net effect: translation flows through the same preview pipeline. No second code path for the formatting.
 
 ## 9. Provider tradeoffs
 
 | Provider | Quality | Pricing | Languages | Notes |
 |----------|---------|---------|-----------|-------|
-| DeepL | Highest for de/es (native quality often indistinguishable from human) | Free tier 500k chars/month; paid from $7/mo | 31 languages including AR | Recommended default. Free tier is plenty for personal use. |
-| Google Cloud Translation | Good. Marginally weaker than DeepL on idioms but covers more languages. | $20 per 1M chars after first 500k free | 130+ | Best for breadth if we add more languages later. |
-| OpenAI (gpt-4o-mini) | Variable but context-aware. Can be prompted with brand/style guidelines. | $0.15 per 1M input tokens, $0.60 per 1M output | All major languages | Future fit if/when we add tone/glossary features. |
+| DeepL | Highest for de/es | Free tier 500k chars/month; paid from $7/mo | 31 languages including AR | Recommended default for v1. |
+| Google Cloud Translation | Good. Marginally weaker than DeepL on idioms but broader coverage. | $20 per 1M chars after 500k free | 130+ | Best fit if we add more languages later. |
+| OpenAI (gpt-4o-mini) | Variable but context-aware. Can be prompted with brand/style guidelines. | $0.15 / 1M input tokens; $0.60 / 1M output | All major languages | Upgrade path for tone/glossary features. |
 
-**Recommendation for v1:** DeepL as the default. Google as the second option for users who need broader language coverage. OpenAI as a third option intended for users who want a tone/glossary upgrade path later.
+**v1 recommendation:** DeepL as default. Google and OpenAI as alternate providers.
 
 ## 10. Edge cases
 
-- **Mixed text in a single layer** (e.g. `"Welcome to NYC"`) — translate as one unit; don't try to detect partial English.
-- **Numbers, dates, prices** — pass through unchanged (DeepL and Google both handle this; OpenAI needs the prompt to specify "preserve numbers and proper nouns").
-- **Emoji-only or punctuation-only layers** — skip the API call; show original as the translation.
-- **Very long layers (>500 chars)** — still send, but warn in the UI if a single layer exceeds 1000 chars (rare for UI copy, common for legal text).
+- **Mixed-content layers** (`"Welcome to NYC"`) — translate as one unit; don't try to detect partial English.
+- **Numbers, dates, prices** — pass through unchanged. DeepL and Google handle this; OpenAI needs an explicit "preserve numbers and proper nouns" instruction in the prompt.
+- **Emoji-only or punctuation-only layers** — skip the API call; preview shows original (no change).
+- **Very long layers (>500 chars)** — still send. Warn if a layer exceeds 1000 chars (rare for UI copy).
 - **Hidden text layers** — same rule as today: skipped by default.
-- **Duplicate strings within the frame** — only one API call per unique string per session (cache).
-- **User switches frames while a translation is mid-flight** — discard the stale response (frameId mismatch).
+- **Duplicate strings within the frame** — one API call per unique string per session (cache).
+- **User changes selection mid-flight** — the in-flight request continues, but only rows that are still selected appear in the preview when it finishes.
+- **User changes frame mid-flight** — the response for the old frame is discarded; preview resets to originals for the new frame.
 - **API key rotation** — on Settings save, clear the in-memory cache so stale translations don't appear under the new key.
 
 ## 11. Performance
 
-- A 65-layer frame batched into one DeepL call is ~1 second round-trip. Per-row pulse during the wait keeps it from feeling stuck.
-- Cache hit rate is high in practice (designers tend to translate the same screen many times during iteration). After the first run on a frame, subsequent language switches that revisit cached pairs are near-instant.
+- A 65-layer frame batched in one DeepL call is ~1 second round-trip. The button-disabled state during the wait is fine UX.
+- Cache hit rate is high: after the first Translate on a frame, Reset → Translate again is instant.
 
 ## 12. Privacy & security
 
-- API key stored only in `figma.clientStorage`, never in the manifest, never in any committed file.
-- All API calls go directly from the sandbox to the provider — Anthropic/Figma servers are not in the path.
-- The README will explicitly state which provider's TOS applies to the user's data and link to each provider's data handling docs.
+- API key stored only in `figma.clientStorage`, never in the manifest, never committed.
+- API calls go directly from the sandbox to the provider — Anthropic and Figma servers are not in the path.
+- The README explicitly states which provider's TOS applies and links to each provider's data-handling docs.
 
 ## 13. Success metrics
 
-If we publish a v2 with this feature, the success bar is:
-
 - **Activation:** 30% of installs configure an API key within 7 days.
-- **Retention:** 40% of users who configure an API key use the translate dropdown more than once a week.
+- **Engagement:** 40% of users who configure a key click Translate more than once a week.
 - **Quality:** zero P0 Figma Community review flags about network behavior on submission.
 
 ## 14. Open questions
 
-- **Q1** — Should we ship with a single Anthropic-hosted proxy so users don't need their own API key (Anthropic eats the bill)? Lower friction but recurring cost. Default answer: no for v1, revisit if installs > 5k.
-- **Q2** — Do we need glossary support (force `"Sign up"` → `"Registrarse"` not `"Inscribirse"`)? Default answer: no for v1; collect feedback first.
-- **Q3** — Should the user be able to add a 4th custom language slot? Default answer: no for v1; the three covered are the most-requested in design org surveys.
-- **Q4** — Does the translation table need to fit in the 50/50 layout we have now, or do we expand the right column when translation is on? Probably we widen the right column to ~60% when translation is on, since two extra columns need ~150px more.
+- **Q1** — Anthropic-hosted proxy so users don't need their own API key (Anthropic eats the bill)? Lower friction but recurring cost. Default: no for v1, revisit if installs > 5k.
+- **Q2** — Per-row glossary overrides ("Sign up" → "Registrarse" not "Inscribirse")? Default: no for v1; collect feedback first.
+- **Q3** — Allow the user to add a custom 4th language slot? Default: no for v1.
+- **Q4** — Should we also show the translated total character delta in the Translated-state badge ("+18% vs original")? Cheap to add, useful signal. Default: yes if it doesn't bloat the badge.
 
 ## 15. Phasing
 
-- **v1.0 — DeepL only, three languages, copy-out** (this PRD).
-- **v1.1** — Google + OpenAI provider options. Per-row "Copy translation only" action.
-- **v2.0** — In-place translation: button to swap the original Figma text with the translation. Behind a confirmation modal because it mutates the document.
+- **v1.0** — DeepL only, three languages, Translate button in Output card (this PRD).
+- **v1.1** — Google + OpenAI provider options.
+- **v1.2** — Reset → undo stack so the user can switch between translated and original output without re-translating.
+- **v2.0** — In-place translation: button on each table row to swap the original Figma text with the translation. Behind a confirmation modal because it mutates the document.
 - **v2.1** — Glossary / brand-term overrides. Persistent across frames.
 
 ## 16. Out of scope (v1)
 
-- Auto-detection of source language (always assume English for v1).
-- Bidirectional translation (translate from a non-English source back to English).
-- A "compare three languages side by side" view (would need a wider table).
+- Auto-detection of source language (always assume English).
+- Bidirectional translation.
+- "Compare three languages side by side" view.
 - Translation history / undo across sessions.
+- Translated character counts shown in the Text Layers table (intentionally left there to keep the table as the source-of-truth originals view).
