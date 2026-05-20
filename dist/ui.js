@@ -1,6 +1,20 @@
 "use strict";
 (() => {
   // src/count/format.ts
+  function graphemeCount(text) {
+    if (!text) return 0;
+    const Seg = globalThis.Intl && Intl.Segmenter;
+    if (typeof Seg === "function") {
+      try {
+        const seg = new Seg(void 0, { granularity: "grapheme" });
+        let n = 0;
+        for (const _ of seg.segment(text)) n++;
+        return n;
+      } catch (e) {
+      }
+    }
+    return Array.from(text).length;
+  }
   function applyRounding(count, mode) {
     if (mode === "down5") return Math.floor(count / 5) * 5;
     if (mode === "up5") return Math.ceil(count / 5) * 5;
@@ -13,12 +27,15 @@
     return single.slice(0, maxLen) + "\u2026";
   }
   function buildPreview(rows, format) {
+    var _a;
     const selected = rows.filter((r) => r.selected);
     if (selected.length === 0) return "";
     const lines = [];
     for (const r of selected) {
-      const rounded = applyRounding(r.item.charCount, r.rounding);
-      const text = displayText(r.item.text);
+      const source = (_a = r.translatedText) != null ? _a : r.item.text;
+      const count = r.translatedText != null ? graphemeCount(r.translatedText) : r.item.charCount;
+      const rounded = applyRounding(count, r.rounding);
+      const text = displayText(source);
       lines.push(formatLine(text, rounded, format));
     }
     return lines.join("\n");
@@ -36,6 +53,11 @@
   }
 
   // src/ui.ts
+  var LANG_LABELS = {
+    de: "German",
+    es: "Spanish",
+    ar: "Arabic"
+  };
   function send(msg) {
     parent.postMessage({ pluginMessage: msg }, "*");
   }
@@ -44,7 +66,11 @@
     currentFrameName: "",
     items: [],
     rowState: /* @__PURE__ */ new Map(),
-    format: "plain"
+    format: "plain",
+    targetLang: "de",
+    activeTranslation: null,
+    translations: /* @__PURE__ */ new Map(),
+    translating: false
   };
   document.addEventListener("DOMContentLoaded", () => {
     wireControls();
@@ -62,6 +88,12 @@
         return;
       case "frame-preview":
         onFramePreview(msg.frameId, msg.bytes);
+        return;
+      case "translations":
+        onTranslations(msg.targetLang, msg.translations);
+        return;
+      case "translation-error":
+        onTranslationError(msg.message);
         return;
     }
   };
@@ -88,6 +120,11 @@
       copy.format = e.target.value;
       renderPreview();
     });
+    byId("translate-lang").addEventListener("change", (e) => {
+      copy.targetLang = e.target.value;
+    });
+    byId("translate-btn").addEventListener("click", onTranslate);
+    byId("reset-translation-btn").addEventListener("click", onResetTranslation);
     byId("copy-now-btn").addEventListener("click", onCopyNow);
   }
   function onNoSelection() {
@@ -95,6 +132,10 @@
     copy.currentFrameName = "";
     copy.items = [];
     copy.rowState.clear();
+    copy.activeTranslation = null;
+    copy.translations.clear();
+    copy.translating = false;
+    hide("translated-badge");
     show("no-selection-state");
     hide("frame-chosen");
     const img = byId("frame-preview-img");
@@ -124,6 +165,10 @@
       }
       byId("bulk-select-all").checked = true;
       byId("bulk-rounding").value = "none";
+      copy.activeTranslation = null;
+      copy.translations.clear();
+      copy.translating = false;
+      hide("translated-badge");
       const img = byId("frame-preview-img");
       if (img.src && img.src.startsWith("blob:")) URL.revokeObjectURL(img.src);
       img.removeAttribute("src");
@@ -213,10 +258,55 @@
   function renderPreview() {
     const rows = copy.items.map((item) => {
       const st = copy.rowState.get(item.nodeId) || { selected: true, rounding: "none" };
-      return { item, selected: st.selected, rounding: st.rounding };
+      const translatedText = copy.activeTranslation != null ? copy.translations.get(item.text) : void 0;
+      return { item, selected: st.selected, rounding: st.rounding, translatedText };
     });
     const text = buildPreview(rows, copy.format);
     byId("preview-area").value = text;
+  }
+  function onTranslate() {
+    if (copy.translating) return;
+    const sources = /* @__PURE__ */ new Set();
+    for (const item of copy.items) {
+      const st = copy.rowState.get(item.nodeId);
+      if (!st || !st.selected) continue;
+      if (item.text.trim()) sources.add(item.text);
+    }
+    if (sources.size === 0) {
+      toast("Select at least one row to translate.");
+      return;
+    }
+    copy.translating = true;
+    setTranslateButtonState();
+    send({ type: "translate", strings: Array.from(sources), targetLang: copy.targetLang });
+  }
+  function onTranslations(targetLang, translations) {
+    copy.translating = false;
+    copy.activeTranslation = targetLang;
+    copy.translations.clear();
+    for (const t of translations) {
+      copy.translations.set(t.source, t.translation);
+    }
+    setText("translated-lang-label", LANG_LABELS[targetLang]);
+    show("translated-badge");
+    setTranslateButtonState();
+    renderPreview();
+  }
+  function onTranslationError(message) {
+    copy.translating = false;
+    setTranslateButtonState();
+    toast(`Translation failed: ${message}`);
+  }
+  function onResetTranslation() {
+    copy.activeTranslation = null;
+    copy.translations.clear();
+    hide("translated-badge");
+    renderPreview();
+  }
+  function setTranslateButtonState() {
+    const btn = byId("translate-btn");
+    btn.disabled = copy.translating;
+    btn.textContent = copy.translating ? "Translating\u2026" : "Translate";
   }
   async function onCopyNow() {
     const ta = byId("preview-area");

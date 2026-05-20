@@ -83,8 +83,23 @@
                   <option value="keyvalue">key: value</option>
                 </select>
               </div>
+              <div class="card-row">
+                <span class="row-label">Translate to</span>
+                <div class="translate-controls">
+                  <select id="translate-lang" class="select-compact">
+                    <option value="de">German</option>
+                    <option value="es">Spanish</option>
+                    <option value="ar">Arabic</option>
+                  </select>
+                  <button class="btn btn-secondary btn-translate" id="translate-btn">Translate</button>
+                </div>
+              </div>
+              <div class="translated-badge hidden" id="translated-badge">
+                <span class="translated-text">Translated to <strong id="translated-lang-label">German</strong></span>
+                <button class="link-btn" id="reset-translation-btn">Reset</button>
+              </div>
               <div class="card-body">
-                <textarea readonly id="preview-area" class="preview"></textarea>
+                <textarea readonly id="preview-area" class="preview" dir="auto"></textarea>
               </div>
               <div class="card-footer">
                 <button class="btn btn-primary btn-block" id="copy-now-btn">Copy now</button>

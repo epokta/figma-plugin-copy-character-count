@@ -33,6 +33,13 @@ export interface PreviewRow {
   item: TextBoxCount;
   rounding: RoundingMode;
   selected: boolean;
+  /**
+   * When present, the preview uses this string in place of `item.text`, and
+   * the displayed character count is the grapheme count of this string. Used
+   * by the Translate feature so the same preview pipeline renders translated
+   * output and translated counts.
+   */
+  translatedText?: string;
 }
 
 // Collapse whitespace, trim, and truncate text so each output row stays single-line.
@@ -48,14 +55,18 @@ export function displayText(text: string, maxLen = 60): string {
 // Build the clipboard preview string from the user's per-row choices.
 // Uses the actual text content (truncated) as the line identifier, not the
 // layer name — so the export reads like the text the designer wrote.
+// When a row carries `translatedText`, that string is used instead and its
+// own grapheme count is what gets rounded.
 export function buildPreview(rows: PreviewRow[], format: CountFormat): string {
   const selected = rows.filter((r) => r.selected);
   if (selected.length === 0) return '';
 
   const lines: string[] = [];
   for (const r of selected) {
-    const rounded = applyRounding(r.item.charCount, r.rounding);
-    const text = displayText(r.item.text);
+    const source = r.translatedText ?? r.item.text;
+    const count = r.translatedText != null ? graphemeCount(r.translatedText) : r.item.charCount;
+    const rounded = applyRounding(count, r.rounding);
+    const text = displayText(source);
     lines.push(formatLine(text, rounded, format));
   }
   return lines.join('\n');

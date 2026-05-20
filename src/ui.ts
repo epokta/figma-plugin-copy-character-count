@@ -10,9 +10,16 @@ import {
   CountFormat,
   MainToUiMessage,
   RoundingMode,
+  TargetLang,
   TextBoxCount,
   UiToMainMessage,
 } from './types';
+
+const LANG_LABELS: Record<TargetLang, string> = {
+  de: 'German',
+  es: 'Spanish',
+  ar: 'Arabic',
+};
 
 // ---------------------------------------------------------------------------
 // Postmessage helpers
@@ -30,6 +37,16 @@ interface CopyState {
   items: TextBoxCount[];
   rowState: Map<string, { selected: boolean; rounding: RoundingMode }>;
   format: CountFormat;
+  /** Currently chosen target language in the dropdown (selected option). */
+  targetLang: TargetLang;
+  /**
+   * When non-null, the output preview is showing translations in this language.
+   * `translations` holds a map of source → translated for every selected row.
+   */
+  activeTranslation: TargetLang | null;
+  translations: Map<string, string>;
+  /** Whether a translation request is in flight. */
+  translating: boolean;
 }
 
 const copy: CopyState = {
@@ -38,6 +55,10 @@ const copy: CopyState = {
   items: [],
   rowState: new Map(),
   format: 'plain',
+  targetLang: 'de',
+  activeTranslation: null,
+  translations: new Map(),
+  translating: false,
 };
 
 // ---------------------------------------------------------------------------
@@ -63,6 +84,12 @@ window.onmessage = (event: MessageEvent) => {
       return;
     case 'frame-preview':
       onFramePreview(msg.frameId, msg.bytes);
+      return;
+    case 'translations':
+      onTranslations(msg.targetLang, msg.translations);
+      return;
+    case 'translation-error':
+      onTranslationError(msg.message);
       return;
   }
 };
@@ -96,6 +123,12 @@ function wireControls() {
     renderPreview();
   });
 
+  (byId('translate-lang') as HTMLSelectElement).addEventListener('change', (e) => {
+    copy.targetLang = (e.target as HTMLSelectElement).value as TargetLang;
+  });
+
+  byId('translate-btn').addEventListener('click', onTranslate);
+  byId('reset-translation-btn').addEventListener('click', onResetTranslation);
   byId('copy-now-btn').addEventListener('click', onCopyNow);
 }
 
@@ -107,6 +140,11 @@ function onNoSelection() {
   copy.currentFrameName = '';
   copy.items = [];
   copy.rowState.clear();
+  // Translation state resets when there's no frame.
+  copy.activeTranslation = null;
+  copy.translations.clear();
+  copy.translating = false;
+  hide('translated-badge');
   show('no-selection-state');
   hide('frame-chosen');
   // Clear any leftover preview image so it doesn't linger.
@@ -141,6 +179,11 @@ function onCountResult(frameId: string, frameName: string, items: TextBoxCount[]
     }
     (byId('bulk-select-all') as HTMLInputElement).checked = true;
     (byId('bulk-rounding') as HTMLSelectElement).value = 'none';
+    // Translations don't carry across frames — reset to originals view.
+    copy.activeTranslation = null;
+    copy.translations.clear();
+    copy.translating = false;
+    hide('translated-badge');
     // Hide the old preview while the new one loads.
     const img = byId('frame-preview-img') as HTMLImageElement;
     if (img.src && img.src.startsWith('blob:')) URL.revokeObjectURL(img.src);
@@ -240,10 +283,72 @@ function syncBulkSelectAll() {
 function renderPreview() {
   const rows: PreviewRow[] = copy.items.map((item) => {
     const st = copy.rowState.get(item.nodeId) || { selected: true, rounding: 'none' as RoundingMode };
-    return { item, selected: st.selected, rounding: st.rounding };
+    // When translations are active, supply the translated string per row.
+    // buildPreview will use its grapheme count + the row's rounding mode.
+    const translatedText =
+      copy.activeTranslation != null
+        ? copy.translations.get(item.text)
+        : undefined;
+    return { item, selected: st.selected, rounding: st.rounding, translatedText };
   });
   const text = buildPreview(rows, copy.format);
   (byId('preview-area') as HTMLTextAreaElement).value = text;
+}
+
+// ---------------------------------------------------------------------------
+// Translate
+
+function onTranslate() {
+  if (copy.translating) return;
+  // Collect the unique set of source strings from currently-selected rows.
+  const sources = new Set<string>();
+  for (const item of copy.items) {
+    const st = copy.rowState.get(item.nodeId);
+    if (!st || !st.selected) continue;
+    if (item.text.trim()) sources.add(item.text);
+  }
+  if (sources.size === 0) {
+    toast('Select at least one row to translate.');
+    return;
+  }
+  copy.translating = true;
+  setTranslateButtonState();
+  send({ type: 'translate', strings: Array.from(sources), targetLang: copy.targetLang });
+}
+
+function onTranslations(
+  targetLang: TargetLang,
+  translations: { source: string; translation: string }[]
+) {
+  copy.translating = false;
+  copy.activeTranslation = targetLang;
+  copy.translations.clear();
+  for (const t of translations) {
+    copy.translations.set(t.source, t.translation);
+  }
+  setText('translated-lang-label', LANG_LABELS[targetLang]);
+  show('translated-badge');
+  setTranslateButtonState();
+  renderPreview();
+}
+
+function onTranslationError(message: string) {
+  copy.translating = false;
+  setTranslateButtonState();
+  toast(`Translation failed: ${message}`);
+}
+
+function onResetTranslation() {
+  copy.activeTranslation = null;
+  copy.translations.clear();
+  hide('translated-badge');
+  renderPreview();
+}
+
+function setTranslateButtonState() {
+  const btn = byId('translate-btn') as HTMLButtonElement;
+  btn.disabled = copy.translating;
+  btn.textContent = copy.translating ? 'Translating…' : 'Translate';
 }
 
 // ---------------------------------------------------------------------------

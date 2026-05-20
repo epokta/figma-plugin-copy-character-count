@@ -7,6 +7,7 @@
 // =============================================================================
 
 import { collect } from './count/collect';
+import { demoProvider } from './translate/demo';
 import { MainToUiMessage, UiToMainMessage } from './types';
 
 // Window size bounds — kept in sync with the UI's resize grip.
@@ -35,6 +36,19 @@ figma.ui.onmessage = async (msg: UiToMainMessage) => {
     case 'refresh':
       await refreshFromSelection();
       return;
+    case 'translate': {
+      try {
+        const translations = await demoProvider.translate(
+          msg.strings,
+          msg.targetLang
+        );
+        send({ type: 'translations', targetLang: msg.targetLang, translations });
+      } catch (e) {
+        const message = e instanceof Error ? e.message : 'Translation failed.';
+        send({ type: 'translation-error', message });
+      }
+      return;
+    }
   }
 };
 

@@ -363,6 +363,40 @@ body {
   font-size: 13px;
 }
 
+/* ---------- Translate controls ---------- */
+.translate-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.btn-translate {
+  font-size: 12px;
+  padding: 5px 12px;
+  font-weight: 500;
+}
+.btn-translate:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+/* Translated-state badge sits just above the preview textarea. */
+.translated-badge {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 16px 8px;
+  padding: 6px 10px;
+  background: var(--bg-subtle);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.translated-badge strong {
+  color: var(--text);
+  font-weight: 500;
+}
+
 /* ---------- Preview textarea ---------- */
 .preview {
   width: 100%;

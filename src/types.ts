@@ -3,6 +3,7 @@
 
 export type RoundingMode = 'none' | 'down5' | 'up5';
 export type CountFormat = 'plain' | 'markdown' | 'keyvalue';
+export type TargetLang = 'de' | 'ar' | 'es';
 
 export interface TextBoxCount {
   nodeId: string;
@@ -11,10 +12,16 @@ export interface TextBoxCount {
   charCount: number;
 }
 
+export interface Translation {
+  source: string;
+  translation: string;
+}
+
 // UI -> Main messages
 export type UiToMainMessage =
   | { type: 'resize'; width: number; height: number }
-  | { type: 'refresh' };
+  | { type: 'refresh' }
+  | { type: 'translate'; strings: string[]; targetLang: TargetLang };
 
 // Main -> UI messages
 export type MainToUiMessage =
@@ -25,4 +32,10 @@ export type MainToUiMessage =
       frameName: string;
       items: TextBoxCount[];
     }
-  | { type: 'frame-preview'; frameId: string; bytes: Uint8Array };
+  | { type: 'frame-preview'; frameId: string; bytes: Uint8Array }
+  | {
+      type: 'translations';
+      targetLang: TargetLang;
+      translations: Translation[];
+    }
+  | { type: 'translation-error'; message: string };
