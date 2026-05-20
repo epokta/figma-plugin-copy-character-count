@@ -131,7 +131,7 @@ body {
 }
 .split-right {
   flex: 3 1 0;
-  min-width: 320px;
+  min-width: 340px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -333,25 +333,25 @@ body {
 .count-table tbody tr + tr td { border-top: 1px solid var(--border); }
 .count-table tbody tr:hover td { background: var(--bg-hover); }
 
-.col-check { width: 28px; }
+.col-check { width: 40px; }
 .col-check input[type="checkbox"] { width: 14px; height: 14px; cursor: pointer; }
-.col-raw { width: 40px; text-align: right; font-variant-numeric: tabular-nums; }
-.col-rounded { width: 48px; text-align: right; font-variant-numeric: tabular-nums; }
+.col-raw { width: 44px; text-align: right; font-variant-numeric: tabular-nums; }
+.col-rounded { width: 52px; text-align: right; font-variant-numeric: tabular-nums; }
 .count-table td.col-raw { color: var(--text-secondary); }
 .count-table td.col-rounded { font-weight: 500; }
 .count-table td.col-raw,
 .count-table td.col-rounded { text-align: right; font-variant-numeric: tabular-nums; }
-.col-mode { width: 80px; }
+.col-mode { width: 116px; }
 .count-table .col-mode select {
   width: 100%;
   font: inherit;
   font-size: 11px;
-  padding: 4px 6px;
-  border: 1px solid var(--border);
+  padding: 5px 8px;
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
   background: var(--bg-card);
   color: var(--text);
-  text-overflow: ellipsis;
+  cursor: pointer;
 }
 .count-table .col-mode select:hover { background: var(--bg-hover); }
 .col-label { min-width: 0; }
