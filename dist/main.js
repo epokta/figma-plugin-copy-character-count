@@ -186,7 +186,7 @@
     const trimmed = source.trim();
     if (!trimmed) return source;
     const phraseHit = dict[target][trimmed.toLowerCase()];
-    if (phraseHit) return phraseHit;
+    if (phraseHit) return restoreCase(trimmed, phraseHit);
     return source.replace(
       /\b[\p{L}\p{M}']+\b/gu,
       (match) => translateWord(match, target)

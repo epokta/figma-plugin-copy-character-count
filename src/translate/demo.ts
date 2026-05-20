@@ -153,9 +153,11 @@ function translateOne(source: string, target: TargetLang): string {
   const trimmed = source.trim();
   if (!trimmed) return source;
 
-  // 1) exact-phrase match (case-insensitive)
+  // 1) exact-phrase match (case-insensitive). Restore the input's case onto
+  //    the dictionary value so "Open" -> "Offen" (not "offen") for entries
+  //    stored as lowercase singletons.
   const phraseHit = dict[target][trimmed.toLowerCase()];
-  if (phraseHit) return phraseHit;
+  if (phraseHit) return restoreCase(trimmed, phraseHit);
 
   // 2) word-by-word fallback. Preserve internal whitespace + punctuation.
   return source.replace(/\b[\p{L}\p{M}']+\b/gu, (match) =>
