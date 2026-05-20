@@ -52,13 +52,20 @@
   }
 
   // src/main.ts
+  var MIN_W = 320;
+  var MIN_H = 400;
+  var MAX_W = 1200;
+  var MAX_H = 1400;
   figma.showUI(__html__, { width: 360, height: 560, themeColors: true });
   figma.ui.onmessage = async (msg) => {
     if (!msg || typeof msg !== "object") return;
     switch (msg.type) {
-      case "resize":
-        figma.ui.resize(360, Math.max(200, Math.min(900, Math.round(msg.height))));
+      case "resize": {
+        const w = clamp(Math.round(msg.width), MIN_W, MAX_W);
+        const h = clamp(Math.round(msg.height), MIN_H, MAX_H);
+        figma.ui.resize(w, h);
         return;
+      }
       case "list-frames":
         await listFrames();
         return;
@@ -70,9 +77,28 @@
   function send(msg) {
     figma.ui.postMessage(msg);
   }
+  function clamp(n, min, max) {
+    return Math.max(min, Math.min(max, n));
+  }
   async function listFrames() {
-    const frames = figma.currentPage.children.filter((n) => n.type === "FRAME").map((n) => ({ id: n.id, name: n.name }));
+    const frames = [];
+    collectFrames(figma.currentPage, frames, []);
     send({ type: "frames", frames });
+  }
+  function collectFrames(parent, out, path) {
+    if (!parent.children) return;
+    for (const child of parent.children) {
+      if (child.type === "FRAME") {
+        out.push({
+          id: child.id,
+          name: child.name,
+          path: path.length > 0 ? path.slice() : void 0
+        });
+      } else if (child.type === "SECTION") {
+        const section = child;
+        collectFrames(section, out, [...path, section.name]);
+      }
+    }
   }
   async function countFrame(frameId) {
     let frame = null;
@@ -90,12 +116,21 @@
       send({ type: "count-result", frameId, frameName: "", items: [] });
       return;
     }
-    const items = collect(frame, false);
+    const frameNode = frame;
+    const items = collect(frameNode, false);
     send({
       type: "count-result",
       frameId,
-      frameName: frame.name,
+      frameName: frameNode.name,
       items
     });
+    try {
+      const bytes = await frameNode.exportAsync({
+        format: "PNG",
+        constraint: { type: "WIDTH", value: 480 }
+      });
+      send({ type: "frame-preview", frameId, bytes });
+    } catch (e) {
+    }
   }
 })();

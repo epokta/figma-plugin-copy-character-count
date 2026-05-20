@@ -49,6 +49,7 @@ const copy: CopyState = {
 
 document.addEventListener('DOMContentLoaded', () => {
   wireCopy();
+  wireResizeGrip();
   // Request the frame list so the picker is populated as soon as the panel opens.
   send({ type: 'list-frames' });
 });
@@ -65,6 +66,9 @@ window.onmessage = (event: MessageEvent) => {
       return;
     case 'count-result':
       onCountResult(msg.frameId, msg.frameName, msg.items);
+      return;
+    case 'frame-preview':
+      onFramePreview(msg.frameId, msg.bytes);
       return;
   }
 };
@@ -153,7 +157,19 @@ function renderFrameList() {
   for (const f of filtered) {
     const btn = document.createElement('button');
     btn.className = 'frame-item';
-    btn.textContent = f.name;
+    if (f.path && f.path.length > 0) {
+      // Show section path as smaller, dimmer text above the frame name.
+      const pathEl = document.createElement('div');
+      pathEl.className = 'frame-item-path';
+      pathEl.textContent = f.path.join(' / ');
+      const nameEl = document.createElement('div');
+      nameEl.className = 'frame-item-name';
+      nameEl.textContent = f.name;
+      btn.appendChild(pathEl);
+      btn.appendChild(nameEl);
+    } else {
+      btn.textContent = f.name;
+    }
     btn.addEventListener('click', () => pickFrame(f.id, f.name));
     list.appendChild(btn);
   }
@@ -165,9 +181,24 @@ function pickFrame(id: string, name: string) {
   copy.warning = null;
   setText('chosen-frame-name', name);
   setText('chosen-frame-sub', 'Loading text layers…');
+  // Hide any previous preview while the new one loads.
+  const img = byId('frame-preview-img') as HTMLImageElement;
+  if (img.src && img.src.startsWith('blob:')) URL.revokeObjectURL(img.src);
+  img.removeAttribute('src');
+  img.classList.add('hidden');
   hide('frame-picker');
   show('frame-chosen');
   send({ type: 'count-frame', frameId: id });
+}
+
+function onFramePreview(frameId: string, bytes: Uint8Array) {
+  if (copy.chosenFrameId !== frameId) return; // stale
+  const blob = new Blob([bytes], { type: 'image/png' });
+  const url = URL.createObjectURL(blob);
+  const img = byId('frame-preview-img') as HTMLImageElement;
+  if (img.src && img.src.startsWith('blob:')) URL.revokeObjectURL(img.src);
+  img.src = url;
+  img.classList.remove('hidden');
 }
 
 function onCountResult(frameId: string, frameName: string, items: TextBoxCount[]) {
@@ -360,4 +391,48 @@ function toast(message: string) {
   toastTimer = window.setTimeout(() => {
     el.classList.add('hidden');
   }, 2200);
+}
+
+// ---------------------------------------------------------------------------
+// User-driven resize. The grip in the bottom-right corner drags to set window
+// size; we post the new dimensions to main.ts which calls figma.ui.resize.
+
+const MIN_W = 320;
+const MIN_H = 400;
+const MAX_W = 1200;
+const MAX_H = 1400;
+
+function wireResizeGrip() {
+  const grip = byId('resize-grip');
+  let resizing = false;
+  let rafPending = false;
+  let pendingW = 0;
+  let pendingH = 0;
+
+  function flush() {
+    rafPending = false;
+    send({ type: 'resize', width: pendingW, height: pendingH });
+  }
+
+  grip.addEventListener('mousedown', (e) => {
+    resizing = true;
+    e.preventDefault();
+    document.body.style.userSelect = 'none';
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (!resizing) return;
+    // The cursor's clientX/Y is in iframe space; the iframe fills the plugin
+    // window, so cursor coords map directly to the target window size.
+    pendingW = Math.max(MIN_W, Math.min(MAX_W, e.clientX + 8));
+    pendingH = Math.max(MIN_H, Math.min(MAX_H, e.clientY + 8));
+    if (!rafPending) {
+      rafPending = true;
+      requestAnimationFrame(flush);
+    }
+  });
+  window.addEventListener('mouseup', () => {
+    if (!resizing) return;
+    resizing = false;
+    document.body.style.userSelect = '';
+  });
 }

@@ -160,6 +160,18 @@ body {
   background: var(--bg-tertiary);
   font-weight: 600;
 }
+.frame-item-path {
+  font-size: 10px;
+  color: var(--text-secondary);
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.frame-item-name {
+  font-size: 12px;
+  color: var(--text);
+}
 
 .warning {
   margin-top: 8px;
@@ -269,3 +281,46 @@ body {
   z-index: 100;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
+
+/* ---------- Frame preview thumbnail ---------- */
+.frame-preview-wrap {
+  margin-top: 10px;
+  display: flex;
+  justify-content: center;
+}
+.frame-preview {
+  display: block;
+  max-width: 100%;
+  max-height: 200px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  object-fit: contain;
+}
+
+/* ---------- Resize grip ---------- */
+.resize-grip {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+  z-index: 100;
+  /* Two diagonal lines drawn with linear-gradient — works in light & dark. */
+  background:
+    linear-gradient(
+      135deg,
+      transparent 0%,
+      transparent 40%,
+      var(--text-secondary) 40%,
+      var(--text-secondary) 50%,
+      transparent 50%,
+      transparent 65%,
+      var(--text-secondary) 65%,
+      var(--text-secondary) 75%,
+      transparent 75%
+    );
+  opacity: 0.6;
+}
+.resize-grip:hover { opacity: 1; }

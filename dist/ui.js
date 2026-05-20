@@ -51,6 +51,7 @@
   };
   document.addEventListener("DOMContentLoaded", () => {
     wireCopy();
+    wireResizeGrip();
     send({ type: "list-frames" });
   });
   window.onmessage = (event) => {
@@ -62,6 +63,9 @@
         return;
       case "count-result":
         onCountResult(msg.frameId, msg.frameName, msg.items);
+        return;
+      case "frame-preview":
+        onFramePreview(msg.frameId, msg.bytes);
         return;
     }
   };
@@ -138,7 +142,18 @@
     for (const f of filtered) {
       const btn = document.createElement("button");
       btn.className = "frame-item";
-      btn.textContent = f.name;
+      if (f.path && f.path.length > 0) {
+        const pathEl = document.createElement("div");
+        pathEl.className = "frame-item-path";
+        pathEl.textContent = f.path.join(" / ");
+        const nameEl = document.createElement("div");
+        nameEl.className = "frame-item-name";
+        nameEl.textContent = f.name;
+        btn.appendChild(pathEl);
+        btn.appendChild(nameEl);
+      } else {
+        btn.textContent = f.name;
+      }
       btn.addEventListener("click", () => pickFrame(f.id, f.name));
       list.appendChild(btn);
     }
@@ -149,9 +164,22 @@
     copy.warning = null;
     setText("chosen-frame-name", name);
     setText("chosen-frame-sub", "Loading text layers\u2026");
+    const img = byId("frame-preview-img");
+    if (img.src && img.src.startsWith("blob:")) URL.revokeObjectURL(img.src);
+    img.removeAttribute("src");
+    img.classList.add("hidden");
     hide("frame-picker");
     show("frame-chosen");
     send({ type: "count-frame", frameId: id });
+  }
+  function onFramePreview(frameId, bytes) {
+    if (copy.chosenFrameId !== frameId) return;
+    const blob = new Blob([bytes], { type: "image/png" });
+    const url = URL.createObjectURL(blob);
+    const img = byId("frame-preview-img");
+    if (img.src && img.src.startsWith("blob:")) URL.revokeObjectURL(img.src);
+    img.src = url;
+    img.classList.remove("hidden");
   }
   function onCountResult(frameId, frameName, items) {
     if (copy.chosenFrameId !== frameId) {
@@ -326,5 +354,39 @@
     toastTimer = window.setTimeout(() => {
       el.classList.add("hidden");
     }, 2200);
+  }
+  var MIN_W = 320;
+  var MIN_H = 400;
+  var MAX_W = 1200;
+  var MAX_H = 1400;
+  function wireResizeGrip() {
+    const grip = byId("resize-grip");
+    let resizing = false;
+    let rafPending = false;
+    let pendingW = 0;
+    let pendingH = 0;
+    function flush() {
+      rafPending = false;
+      send({ type: "resize", width: pendingW, height: pendingH });
+    }
+    grip.addEventListener("mousedown", (e) => {
+      resizing = true;
+      e.preventDefault();
+      document.body.style.userSelect = "none";
+    });
+    window.addEventListener("mousemove", (e) => {
+      if (!resizing) return;
+      pendingW = Math.max(MIN_W, Math.min(MAX_W, e.clientX + 8));
+      pendingH = Math.max(MIN_H, Math.min(MAX_H, e.clientY + 8));
+      if (!rafPending) {
+        rafPending = true;
+        requestAnimationFrame(flush);
+      }
+    });
+    window.addEventListener("mouseup", () => {
+      if (!resizing) return;
+      resizing = false;
+      document.body.style.userSelect = "";
+    });
   }
 })();
