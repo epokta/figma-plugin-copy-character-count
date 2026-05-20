@@ -35,39 +35,41 @@ export interface PreviewRow {
   selected: boolean;
 }
 
+// Collapse whitespace, trim, and truncate text so each output row stays single-line.
+// Used both by the table UI and by the clipboard preview so what you see is what
+// you copy.
+export function displayText(text: string, maxLen = 60): string {
+  const single = text.replace(/\s+/g, ' ').trim();
+  if (!single) return '(empty)';
+  if (single.length <= maxLen) return single;
+  return single.slice(0, maxLen) + '…';
+}
+
 // Build the clipboard preview string from the user's per-row choices.
+// Uses the actual text content (truncated) as the line identifier, not the
+// layer name — so the export reads like the text the designer wrote.
 export function buildPreview(rows: PreviewRow[], format: CountFormat): string {
   const selected = rows.filter((r) => r.selected);
   if (selected.length === 0) return '';
 
-  // Disambiguate duplicate labels by appending the text snippet.
-  const labelCounts = new Map<string, number>();
-  for (const r of selected) {
-    labelCounts.set(r.item.label, (labelCounts.get(r.item.label) || 0) + 1);
-  }
-
   const lines: string[] = [];
   for (const r of selected) {
     const rounded = applyRounding(r.item.charCount, r.rounding);
-    let label = r.item.label;
-    if ((labelCounts.get(label) || 0) > 1) {
-      const snippet = r.item.text.trim().slice(0, 24);
-      if (snippet && snippet !== label) label = `${label} (${snippet})`;
-    }
-    lines.push(formatLine(label, rounded, format));
+    const text = displayText(r.item.text);
+    lines.push(formatLine(text, rounded, format));
   }
   return lines.join('\n');
 }
 
-function formatLine(label: string, count: number, format: CountFormat): string {
+function formatLine(text: string, count: number, format: CountFormat): string {
   switch (format) {
     case 'markdown':
-      return `- ${label}: ${count} chars`;
+      return `- ${text}: ${count} chars`;
     case 'keyvalue':
-      return `${label}: ${count}`;
+      return `${text}: ${count}`;
     case 'plain':
     default:
-      return `${label}: ${count} chars`;
+      return `${text}: ${count} chars`;
   }
 }
 

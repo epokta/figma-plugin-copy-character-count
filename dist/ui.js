@@ -6,34 +6,32 @@
     if (mode === "up5") return Math.ceil(count / 5) * 5;
     return count;
   }
+  function displayText(text, maxLen = 60) {
+    const single = text.replace(/\s+/g, " ").trim();
+    if (!single) return "(empty)";
+    if (single.length <= maxLen) return single;
+    return single.slice(0, maxLen) + "\u2026";
+  }
   function buildPreview(rows, format) {
     const selected = rows.filter((r) => r.selected);
     if (selected.length === 0) return "";
-    const labelCounts = /* @__PURE__ */ new Map();
-    for (const r of selected) {
-      labelCounts.set(r.item.label, (labelCounts.get(r.item.label) || 0) + 1);
-    }
     const lines = [];
     for (const r of selected) {
       const rounded = applyRounding(r.item.charCount, r.rounding);
-      let label = r.item.label;
-      if ((labelCounts.get(label) || 0) > 1) {
-        const snippet = r.item.text.trim().slice(0, 24);
-        if (snippet && snippet !== label) label = `${label} (${snippet})`;
-      }
-      lines.push(formatLine(label, rounded, format));
+      const text = displayText(r.item.text);
+      lines.push(formatLine(text, rounded, format));
     }
     return lines.join("\n");
   }
-  function formatLine(label, count, format) {
+  function formatLine(text, count, format) {
     switch (format) {
       case "markdown":
-        return `- ${label}: ${count} chars`;
+        return `- ${text}: ${count} chars`;
       case "keyvalue":
-        return `${label}: ${count}`;
+        return `${text}: ${count}`;
       case "plain":
       default:
-        return `${label}: ${count} chars`;
+        return `${text}: ${count} chars`;
     }
   }
 
@@ -191,8 +189,7 @@
       const tr = document.createElement("tr");
       tr.innerHTML = `
       <td class="col-check"><input type="checkbox" data-id="${escapeAttr(item.nodeId)}" ${st.selected ? "checked" : ""} /></td>
-      <td class="cell-label" title="${escapeAttr(item.label)}
-${escapeAttr(item.text)}">${escapeHtml(item.label)}</td>
+      <td class="cell-label" title="${escapeAttr(item.label)}&#10;${escapeAttr(item.text)}">${escapeHtml(displayText(item.text))}</td>
       <td class="col-raw">${item.charCount}</td>
       <td class="col-rounded">${applyRoundingClient(item.charCount, st.rounding)}</td>
       <td class="col-mode">

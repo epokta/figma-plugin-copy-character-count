@@ -2,7 +2,7 @@
 // Runs inside the plugin's iframe; talks to main.ts via parent.postMessage /
 // window.onmessage. Clipboard access lives here (the sandbox can't reach it).
 
-import { buildPreview, PreviewRow } from './count/format';
+import { buildPreview, displayText, PreviewRow } from './count/format';
 import {
   CountFormat,
   FrameSummary,
@@ -210,7 +210,7 @@ function renderCountTable() {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="col-check"><input type="checkbox" data-id="${escapeAttr(item.nodeId)}" ${st.selected ? 'checked' : ''} /></td>
-      <td class="cell-label" title="${escapeAttr(item.label)}\n${escapeAttr(item.text)}">${escapeHtml(item.label)}</td>
+      <td class="cell-label" title="${escapeAttr(item.label)}&#10;${escapeAttr(item.text)}">${escapeHtml(displayText(item.text))}</td>
       <td class="col-raw">${item.charCount}</td>
       <td class="col-rounded">${applyRoundingClient(item.charCount, st.rounding)}</td>
       <td class="col-mode">
