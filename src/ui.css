@@ -243,13 +243,15 @@ body {
 .select-compact {
   font: inherit;
   font-size: 12px;
-  padding: 5px 10px;
+  /* 8px top/bottom and 14px on the right so the native dropdown chevron has
+     at least 8px of breathing room on every side. */
+  padding: 8px 30px 8px 12px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
   background: var(--bg-card);
   color: var(--text);
   cursor: pointer;
-  min-width: 110px;
+  min-width: 120px;
 }
 .select-compact:hover { background: var(--bg-hover); }
 .select-compact:focus { outline: 2px solid var(--brand); outline-offset: -1px; }
@@ -340,7 +342,8 @@ body {
   width: 100%;
   font: inherit;
   font-size: 11px;
-  padding: 5px 8px;
+  /* Match the larger selects: at least 8px around the dropdown chevron. */
+  padding: 6px 24px 6px 10px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
   background: var(--bg-card);
