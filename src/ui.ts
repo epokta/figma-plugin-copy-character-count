@@ -1,11 +1,13 @@
 // UI-side logic for the Copy character count panel.
 // Runs inside the plugin's iframe; talks to main.ts via parent.postMessage /
 // window.onmessage. Clipboard access lives here (the sandbox can't reach it).
+//
+// No in-plugin frame picker — the panel auto-fills from whatever the user has
+// selected in the canvas, and updates as their selection changes.
 
 import { buildPreview, displayText, PreviewRow } from './count/format';
 import {
   CountFormat,
-  FrameSummary,
   MainToUiMessage,
   RoundingMode,
   TextBoxCount,
@@ -23,35 +25,27 @@ function send(msg: UiToMainMessage) {
 // State
 
 interface CopyState {
-  frames: FrameSummary[];
-  search: string;
-  chosenFrameId: string | null;
-  chosenFrameName: string;
+  currentFrameId: string | null;
+  currentFrameName: string;
   items: TextBoxCount[];
   rowState: Map<string, { selected: boolean; rounding: RoundingMode }>;
   format: CountFormat;
-  warning: string | null;
 }
 
 const copy: CopyState = {
-  frames: [],
-  search: '',
-  chosenFrameId: null,
-  chosenFrameName: '',
+  currentFrameId: null,
+  currentFrameName: '',
   items: [],
   rowState: new Map(),
   format: 'plain',
-  warning: null,
 };
 
 // ---------------------------------------------------------------------------
 // Boot
 
 document.addEventListener('DOMContentLoaded', () => {
-  wireCopy();
+  wireControls();
   wireResizeGrip();
-  // Request the frame list so the picker is populated as soon as the panel opens.
-  send({ type: 'list-frames' });
 });
 
 // ---------------------------------------------------------------------------
@@ -61,8 +55,8 @@ window.onmessage = (event: MessageEvent) => {
   const msg = event.data && (event.data.pluginMessage as MainToUiMessage);
   if (!msg) return;
   switch (msg.type) {
-    case 'frames':
-      onFrames(msg.frames);
+    case 'no-selection':
+      onNoSelection();
       return;
     case 'count-result':
       onCountResult(msg.frameId, msg.frameName, msg.items);
@@ -74,27 +68,9 @@ window.onmessage = (event: MessageEvent) => {
 };
 
 // ---------------------------------------------------------------------------
-// Copy panel wiring
+// Wire bulk + format + copy controls
 
-function wireCopy() {
-  (byId('frame-search') as HTMLInputElement).addEventListener('input', (e) => {
-    copy.search = (e.target as HTMLInputElement).value.toLowerCase();
-    renderFrameList();
-  });
-  byId('use-selection-btn').addEventListener('click', () => {
-    // Ask main to list frames; user picks from the surfaced list.
-    send({ type: 'list-frames' });
-  });
-  byId('change-frame-btn').addEventListener('click', () => {
-    copy.chosenFrameId = null;
-    copy.items = [];
-    copy.rowState.clear();
-    copy.warning = null;
-    show('frame-picker');
-    hide('frame-chosen');
-    send({ type: 'list-frames' });
-  });
-
+function wireControls() {
   (byId('bulk-rounding') as HTMLSelectElement).addEventListener('change', (e) => {
     const mode = (e.target as HTMLSelectElement).value as RoundingMode;
     for (const item of copy.items) {
@@ -123,76 +99,70 @@ function wireCopy() {
   byId('copy-now-btn').addEventListener('click', onCopyNow);
 }
 
-function onFrames(frames: FrameSummary[]) {
-  copy.frames = frames;
-  // If we're already viewing a chosen frame, check that it's still there.
-  if (copy.chosenFrameId) {
-    const stillThere = frames.find((f) => f.id === copy.chosenFrameId);
-    if (!stillThere) {
-      copy.warning = 'The chosen frame was deleted. Pick another.';
-      showFrameWarning();
-    } else if (stillThere.name !== copy.chosenFrameName) {
-      copy.chosenFrameName = stillThere.name;
-      setText('chosen-frame-name', stillThere.name);
-    }
-  }
-  if (copy.chosenFrameId === null) {
-    show('frame-picker');
-    hide('frame-chosen');
-  }
-  renderFrameList();
-}
+// ---------------------------------------------------------------------------
+// Selection / count handling
 
-function renderFrameList() {
-  const list = byId('frame-list');
-  list.innerHTML = '';
-  const filtered = copy.frames.filter((f) =>
-    !copy.search || f.name.toLowerCase().includes(copy.search)
-  );
-  if (copy.frames.length === 0) {
-    show('no-frames-state');
-    return;
-  }
-  hide('no-frames-state');
-  for (const f of filtered) {
-    const btn = document.createElement('button');
-    btn.className = 'frame-item';
-    if (f.path && f.path.length > 0) {
-      // Show section path as smaller, dimmer text above the frame name.
-      const pathEl = document.createElement('div');
-      pathEl.className = 'frame-item-path';
-      pathEl.textContent = f.path.join(' / ');
-      const nameEl = document.createElement('div');
-      nameEl.className = 'frame-item-name';
-      nameEl.textContent = f.name;
-      btn.appendChild(pathEl);
-      btn.appendChild(nameEl);
-    } else {
-      btn.textContent = f.name;
-    }
-    btn.addEventListener('click', () => pickFrame(f.id, f.name));
-    list.appendChild(btn);
-  }
-}
-
-function pickFrame(id: string, name: string) {
-  copy.chosenFrameId = id;
-  copy.chosenFrameName = name;
-  copy.warning = null;
-  setText('chosen-frame-name', name);
-  setText('chosen-frame-sub', 'Loading text layers…');
-  // Hide any previous preview while the new one loads.
+function onNoSelection() {
+  copy.currentFrameId = null;
+  copy.currentFrameName = '';
+  copy.items = [];
+  copy.rowState.clear();
+  show('no-selection-state');
+  hide('frame-chosen');
+  // Clear any leftover preview image so it doesn't linger.
   const img = byId('frame-preview-img') as HTMLImageElement;
   if (img.src && img.src.startsWith('blob:')) URL.revokeObjectURL(img.src);
   img.removeAttribute('src');
   img.classList.add('hidden');
-  hide('frame-picker');
+}
+
+function onCountResult(frameId: string, frameName: string, items: TextBoxCount[]) {
+  const sameFrame = copy.currentFrameId === frameId;
+  copy.currentFrameId = frameId;
+  copy.currentFrameName = frameName;
+  copy.items = items;
+
+  if (sameFrame) {
+    // Preserve user's row choices for nodes that still exist; add new ones; drop deleted ones.
+    const existingIds = new Set(items.map((i) => i.nodeId));
+    for (const id of Array.from(copy.rowState.keys())) {
+      if (!existingIds.has(id)) copy.rowState.delete(id);
+    }
+    for (const item of items) {
+      if (!copy.rowState.has(item.nodeId)) {
+        copy.rowState.set(item.nodeId, { selected: true, rounding: 'none' });
+      }
+    }
+  } else {
+    // New frame — reset state.
+    copy.rowState.clear();
+    for (const item of items) {
+      copy.rowState.set(item.nodeId, { selected: true, rounding: 'none' });
+    }
+    (byId('bulk-select-all') as HTMLInputElement).checked = true;
+    (byId('bulk-rounding') as HTMLSelectElement).value = 'none';
+    // Hide the old preview while the new one loads.
+    const img = byId('frame-preview-img') as HTMLImageElement;
+    if (img.src && img.src.startsWith('blob:')) URL.revokeObjectURL(img.src);
+    img.removeAttribute('src');
+    img.classList.add('hidden');
+  }
+
+  setText('chosen-frame-name', frameName || 'Frame');
+  setText(
+    'chosen-frame-sub',
+    `${items.length} text layer${items.length === 1 ? '' : 's'}`
+  );
+
+  hide('no-selection-state');
   show('frame-chosen');
-  send({ type: 'count-frame', frameId: id });
+  renderCountTable();
+  renderPreview();
+  syncBulkSelectAll();
 }
 
 function onFramePreview(frameId: string, bytes: Uint8Array) {
-  if (copy.chosenFrameId !== frameId) return; // stale
+  if (copy.currentFrameId !== frameId) return; // stale
   const blob = new Blob([bytes], { type: 'image/png' });
   const url = URL.createObjectURL(blob);
   const img = byId('frame-preview-img') as HTMLImageElement;
@@ -201,28 +171,8 @@ function onFramePreview(frameId: string, bytes: Uint8Array) {
   img.classList.remove('hidden');
 }
 
-function onCountResult(frameId: string, frameName: string, items: TextBoxCount[]) {
-  if (copy.chosenFrameId !== frameId) {
-    // Stale response — ignore.
-    return;
-  }
-  copy.chosenFrameName = frameName || copy.chosenFrameName;
-  setText('chosen-frame-name', copy.chosenFrameName);
-  copy.items = items;
-  copy.rowState.clear();
-  for (const item of items) {
-    copy.rowState.set(item.nodeId, { selected: true, rounding: 'none' });
-  }
-  setText(
-    'chosen-frame-sub',
-    `${items.length} text layer${items.length === 1 ? '' : 's'}`
-  );
-  // Reset bulk controls.
-  (byId('bulk-select-all') as HTMLInputElement).checked = true;
-  (byId('bulk-rounding') as HTMLSelectElement).value = 'none';
-  renderCountTable();
-  renderPreview();
-}
+// ---------------------------------------------------------------------------
+// Table + preview rendering
 
 function renderCountTable() {
   const tbody = byId('count-tbody');
@@ -269,7 +219,6 @@ function renderCountTable() {
       const id = sel.getAttribute('data-id') || '';
       const st = copy.rowState.get(id);
       if (st) st.rounding = sel.value as RoundingMode;
-      // Update just this row's rounded count.
       renderCountTable();
       renderPreview();
     });
@@ -284,7 +233,7 @@ function applyRoundingClient(count: number, mode: RoundingMode): number {
 
 function syncBulkSelectAll() {
   const cb = byId('bulk-select-all') as HTMLInputElement;
-  const allSelected = copy.items.every((item) => copy.rowState.get(item.nodeId)?.selected);
+  const allSelected = copy.items.length > 0 && copy.items.every((item) => copy.rowState.get(item.nodeId)?.selected);
   cb.checked = allSelected;
 }
 
@@ -295,17 +244,6 @@ function renderPreview() {
   });
   const text = buildPreview(rows, copy.format);
   (byId('preview-area') as HTMLTextAreaElement).value = text;
-}
-
-function showFrameWarning() {
-  const el = byId('frame-warning');
-  if (!copy.warning) {
-    el.classList.add('hidden');
-    el.textContent = '';
-    return;
-  }
-  el.classList.remove('hidden');
-  el.textContent = copy.warning;
 }
 
 // ---------------------------------------------------------------------------
@@ -334,7 +272,6 @@ async function onCopyNow() {
       btn.textContent = originalLabel || 'Copy now';
     }, 1500);
   } catch {
-    // Fallback: select textarea + execCommand.
     try {
       ta.focus();
       ta.select();
@@ -421,8 +358,6 @@ function wireResizeGrip() {
   });
   window.addEventListener('mousemove', (e) => {
     if (!resizing) return;
-    // The cursor's clientX/Y is in iframe space; the iframe fills the plugin
-    // window, so cursor coords map directly to the target window size.
     pendingW = Math.max(MIN_W, Math.min(MAX_W, e.clientX + 8));
     pendingH = Math.max(MIN_H, Math.min(MAX_H, e.clientY + 8));
     if (!rafPending) {

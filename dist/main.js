@@ -56,6 +56,7 @@
   var MIN_H = 400;
   var MAX_W = 1200;
   var MAX_H = 1400;
+  var SELECTION_DEBOUNCE_MS = 150;
   figma.showUI(__html__, { width: 360, height: 560, themeColors: true });
   figma.ui.onmessage = async (msg) => {
     if (!msg || typeof msg !== "object") return;
@@ -66,11 +67,8 @@
         figma.ui.resize(w, h);
         return;
       }
-      case "list-frames":
-        await listFrames();
-        return;
-      case "count-frame":
-        await countFrame(msg.frameId);
+      case "refresh":
+        await refreshFromSelection();
         return;
     }
   };
@@ -80,57 +78,51 @@
   function clamp(n, min, max) {
     return Math.max(min, Math.min(max, n));
   }
-  async function listFrames() {
-    const frames = [];
-    collectFrames(figma.currentPage, frames, []);
-    send({ type: "frames", frames });
-  }
-  function collectFrames(parent, out, path) {
-    if (!parent.children) return;
-    for (const child of parent.children) {
-      if (child.type === "FRAME") {
-        out.push({
-          id: child.id,
-          name: child.name,
-          path: path.length > 0 ? path.slice() : void 0
-        });
-      } else if (child.type === "SECTION") {
-        const section = child;
-        collectFrames(section, out, [...path, section.name]);
-      }
-    }
-  }
-  async function countFrame(frameId) {
+  async function refreshFromSelection() {
+    const selection = figma.currentPage.selection;
     let frame = null;
-    try {
-      if (typeof figma.getNodeByIdAsync === "function") {
-        frame = await figma.getNodeByIdAsync(frameId);
-      } else {
-        frame = figma.getNodeById(frameId);
+    for (const node of selection) {
+      const candidate = findFrameAncestor(node);
+      if (candidate) {
+        frame = candidate;
+        break;
       }
-    } catch (e) {
-      frame = null;
     }
-    if (!frame || frame.type !== "FRAME") {
-      figma.notify("That frame is no longer available. Pick another.");
-      send({ type: "count-result", frameId, frameName: "", items: [] });
+    if (!frame) {
+      send({ type: "no-selection" });
       return;
     }
-    const frameNode = frame;
-    const items = collect(frameNode, false);
+    const items = collect(frame, false);
     send({
       type: "count-result",
-      frameId,
-      frameName: frameNode.name,
+      frameId: frame.id,
+      frameName: frame.name,
       items
     });
     try {
-      const bytes = await frameNode.exportAsync({
+      const bytes = await frame.exportAsync({
         format: "PNG",
         constraint: { type: "WIDTH", value: 480 }
       });
-      send({ type: "frame-preview", frameId, bytes });
+      send({ type: "frame-preview", frameId: frame.id, bytes });
     } catch (e) {
     }
   }
+  function findFrameAncestor(node) {
+    let current = node;
+    while (current) {
+      if (current.type === "FRAME") return current;
+      current = current.parent;
+    }
+    return null;
+  }
+  var selectionTimer;
+  figma.on("selectionchange", () => {
+    if (selectionTimer) clearTimeout(selectionTimer);
+    selectionTimer = setTimeout(() => {
+      selectionTimer = void 0;
+      refreshFromSelection();
+    }, SELECTION_DEBOUNCE_MS);
+  });
+  refreshFromSelection();
 })();

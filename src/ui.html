@@ -9,28 +9,19 @@
 <body>
   <div class="app">
     <section class="panel" id="panel-copy">
-      <!-- Frame picker -->
-      <div class="copy-section" id="frame-picker">
+
+      <!-- Empty state: no frame selected in the canvas -->
+      <div class="copy-section" id="no-selection-state">
         <header class="panel-header">
-          <h1 class="header-title">Choose a frame to count.</h1>
+          <h1 class="header-title">Select a frame</h1>
+          <div class="header-sub">Click a frame in the canvas to count its text layers. The panel updates automatically as your selection changes.</div>
         </header>
-        <div class="search-row">
-          <input type="search" id="frame-search" placeholder="Search frames…" />
-          <button class="btn btn-secondary" id="use-selection-btn">Use current selection</button>
-        </div>
-        <div class="frame-list" id="frame-list" role="listbox" aria-label="Top-level frames"></div>
-        <div class="state state-empty hidden" id="no-frames-state">
-          <p>This page has no top-level frames.</p>
-        </div>
       </div>
 
-      <!-- Frame chosen -->
+      <!-- Frame selected -->
       <div class="copy-section hidden" id="frame-chosen">
         <header class="panel-header">
-          <div class="header-row">
-            <h1 class="header-title" id="chosen-frame-name">Frame</h1>
-            <button class="link-btn" id="change-frame-btn">Change frame</button>
-          </div>
+          <h1 class="header-title" id="chosen-frame-name">Frame</h1>
           <div class="header-sub" id="chosen-frame-sub">0 text layers</div>
           <div class="warning hidden" id="frame-warning"></div>
           <div class="frame-preview-wrap">

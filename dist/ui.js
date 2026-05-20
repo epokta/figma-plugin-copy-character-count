@@ -40,26 +40,22 @@
     parent.postMessage({ pluginMessage: msg }, "*");
   }
   var copy = {
-    frames: [],
-    search: "",
-    chosenFrameId: null,
-    chosenFrameName: "",
+    currentFrameId: null,
+    currentFrameName: "",
     items: [],
     rowState: /* @__PURE__ */ new Map(),
-    format: "plain",
-    warning: null
+    format: "plain"
   };
   document.addEventListener("DOMContentLoaded", () => {
-    wireCopy();
+    wireControls();
     wireResizeGrip();
-    send({ type: "list-frames" });
   });
   window.onmessage = (event) => {
     const msg = event.data && event.data.pluginMessage;
     if (!msg) return;
     switch (msg.type) {
-      case "frames":
-        onFrames(msg.frames);
+      case "no-selection":
+        onNoSelection();
         return;
       case "count-result":
         onCountResult(msg.frameId, msg.frameName, msg.items);
@@ -69,23 +65,7 @@
         return;
     }
   };
-  function wireCopy() {
-    byId("frame-search").addEventListener("input", (e) => {
-      copy.search = e.target.value.toLowerCase();
-      renderFrameList();
-    });
-    byId("use-selection-btn").addEventListener("click", () => {
-      send({ type: "list-frames" });
-    });
-    byId("change-frame-btn").addEventListener("click", () => {
-      copy.chosenFrameId = null;
-      copy.items = [];
-      copy.rowState.clear();
-      copy.warning = null;
-      show("frame-picker");
-      hide("frame-chosen");
-      send({ type: "list-frames" });
-    });
+  function wireControls() {
     byId("bulk-rounding").addEventListener("change", (e) => {
       const mode = e.target.value;
       for (const item of copy.items) {
@@ -110,96 +90,64 @@
     });
     byId("copy-now-btn").addEventListener("click", onCopyNow);
   }
-  function onFrames(frames) {
-    copy.frames = frames;
-    if (copy.chosenFrameId) {
-      const stillThere = frames.find((f) => f.id === copy.chosenFrameId);
-      if (!stillThere) {
-        copy.warning = "The chosen frame was deleted. Pick another.";
-        showFrameWarning();
-      } else if (stillThere.name !== copy.chosenFrameName) {
-        copy.chosenFrameName = stillThere.name;
-        setText("chosen-frame-name", stillThere.name);
-      }
-    }
-    if (copy.chosenFrameId === null) {
-      show("frame-picker");
-      hide("frame-chosen");
-    }
-    renderFrameList();
-  }
-  function renderFrameList() {
-    const list = byId("frame-list");
-    list.innerHTML = "";
-    const filtered = copy.frames.filter(
-      (f) => !copy.search || f.name.toLowerCase().includes(copy.search)
-    );
-    if (copy.frames.length === 0) {
-      show("no-frames-state");
-      return;
-    }
-    hide("no-frames-state");
-    for (const f of filtered) {
-      const btn = document.createElement("button");
-      btn.className = "frame-item";
-      if (f.path && f.path.length > 0) {
-        const pathEl = document.createElement("div");
-        pathEl.className = "frame-item-path";
-        pathEl.textContent = f.path.join(" / ");
-        const nameEl = document.createElement("div");
-        nameEl.className = "frame-item-name";
-        nameEl.textContent = f.name;
-        btn.appendChild(pathEl);
-        btn.appendChild(nameEl);
-      } else {
-        btn.textContent = f.name;
-      }
-      btn.addEventListener("click", () => pickFrame(f.id, f.name));
-      list.appendChild(btn);
-    }
-  }
-  function pickFrame(id, name) {
-    copy.chosenFrameId = id;
-    copy.chosenFrameName = name;
-    copy.warning = null;
-    setText("chosen-frame-name", name);
-    setText("chosen-frame-sub", "Loading text layers\u2026");
+  function onNoSelection() {
+    copy.currentFrameId = null;
+    copy.currentFrameName = "";
+    copy.items = [];
+    copy.rowState.clear();
+    show("no-selection-state");
+    hide("frame-chosen");
     const img = byId("frame-preview-img");
     if (img.src && img.src.startsWith("blob:")) URL.revokeObjectURL(img.src);
     img.removeAttribute("src");
     img.classList.add("hidden");
-    hide("frame-picker");
+  }
+  function onCountResult(frameId, frameName, items) {
+    const sameFrame = copy.currentFrameId === frameId;
+    copy.currentFrameId = frameId;
+    copy.currentFrameName = frameName;
+    copy.items = items;
+    if (sameFrame) {
+      const existingIds = new Set(items.map((i) => i.nodeId));
+      for (const id of Array.from(copy.rowState.keys())) {
+        if (!existingIds.has(id)) copy.rowState.delete(id);
+      }
+      for (const item of items) {
+        if (!copy.rowState.has(item.nodeId)) {
+          copy.rowState.set(item.nodeId, { selected: true, rounding: "none" });
+        }
+      }
+    } else {
+      copy.rowState.clear();
+      for (const item of items) {
+        copy.rowState.set(item.nodeId, { selected: true, rounding: "none" });
+      }
+      byId("bulk-select-all").checked = true;
+      byId("bulk-rounding").value = "none";
+      const img = byId("frame-preview-img");
+      if (img.src && img.src.startsWith("blob:")) URL.revokeObjectURL(img.src);
+      img.removeAttribute("src");
+      img.classList.add("hidden");
+    }
+    setText("chosen-frame-name", frameName || "Frame");
+    setText(
+      "chosen-frame-sub",
+      `${items.length} text layer${items.length === 1 ? "" : "s"}`
+    );
+    hide("no-selection-state");
     show("frame-chosen");
-    send({ type: "count-frame", frameId: id });
+    renderCountTable();
+    renderPreview();
+    syncBulkSelectAll();
   }
   function onFramePreview(frameId, bytes) {
-    if (copy.chosenFrameId !== frameId) return;
+    if (copy.currentFrameId !== frameId) return;
     const blob = new Blob([bytes], { type: "image/png" });
     const url = URL.createObjectURL(blob);
     const img = byId("frame-preview-img");
     if (img.src && img.src.startsWith("blob:")) URL.revokeObjectURL(img.src);
     img.src = url;
     img.classList.remove("hidden");
-  }
-  function onCountResult(frameId, frameName, items) {
-    if (copy.chosenFrameId !== frameId) {
-      return;
-    }
-    copy.chosenFrameName = frameName || copy.chosenFrameName;
-    setText("chosen-frame-name", copy.chosenFrameName);
-    copy.items = items;
-    copy.rowState.clear();
-    for (const item of items) {
-      copy.rowState.set(item.nodeId, { selected: true, rounding: "none" });
-    }
-    setText(
-      "chosen-frame-sub",
-      `${items.length} text layer${items.length === 1 ? "" : "s"}`
-    );
-    byId("bulk-select-all").checked = true;
-    byId("bulk-rounding").value = "none";
-    renderCountTable();
-    renderPreview();
   }
   function renderCountTable() {
     const tbody = byId("count-tbody");
@@ -256,7 +204,7 @@
   }
   function syncBulkSelectAll() {
     const cb = byId("bulk-select-all");
-    const allSelected = copy.items.every((item) => {
+    const allSelected = copy.items.length > 0 && copy.items.every((item) => {
       var _a;
       return (_a = copy.rowState.get(item.nodeId)) == null ? void 0 : _a.selected;
     });
@@ -269,16 +217,6 @@
     });
     const text = buildPreview(rows, copy.format);
     byId("preview-area").value = text;
-  }
-  function showFrameWarning() {
-    const el = byId("frame-warning");
-    if (!copy.warning) {
-      el.classList.add("hidden");
-      el.textContent = "";
-      return;
-    }
-    el.classList.remove("hidden");
-    el.textContent = copy.warning;
   }
   async function onCopyNow() {
     const ta = byId("preview-area");

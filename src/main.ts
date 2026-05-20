@@ -1,21 +1,22 @@
 // =============================================================================
 // Copy character count — sandbox entry point.
 //
-// Lists frames on the current page (including frames nested inside Sections)
-// and, on request, walks a single frame to produce a TextBoxCount[] (one entry
-// per text node) that the UI uses to render the table, preview, and clipboard
-// output. Also exports a small PNG preview of the chosen frame so the UI can
-// show a thumbnail. The plugin never mutates the document — it is read-only.
+// Behaves like Figma's right inspector: whatever frame the user has selected
+// (or has anything selected inside of) becomes the counted frame. Selection
+// changes auto-update the panel — no in-plugin picker step. Read-only.
 // =============================================================================
 
 import { collect } from './count/collect';
-import { FrameSummary, MainToUiMessage, UiToMainMessage } from './types';
+import { MainToUiMessage, UiToMainMessage } from './types';
 
 // Window size bounds — kept in sync with the UI's resize grip.
 const MIN_W = 320;
 const MIN_H = 400;
 const MAX_W = 1200;
 const MAX_H = 1400;
+
+// Debounce selection-change so clicking around doesn't run an export per click.
+const SELECTION_DEBOUNCE_MS = 150;
 
 // ---------------------------------------------------------------------------
 // Bootstrap
@@ -31,11 +32,8 @@ figma.ui.onmessage = async (msg: UiToMainMessage) => {
       figma.ui.resize(w, h);
       return;
     }
-    case 'list-frames':
-      await listFrames();
-      return;
-    case 'count-frame':
-      await countFrame(msg.frameId);
+    case 'refresh':
+      await refreshFromSelection();
       return;
   }
 };
@@ -49,73 +47,64 @@ function clamp(n: number, min: number, max: number): number {
 }
 
 // ---------------------------------------------------------------------------
-// Frame discovery — walks into Sections so frames nested inside sections are
-// findable. Stops at frames (doesn't recurse into nested frames, which are
-// usually component parts rather than standalone screens).
+// Selection → frame
 
-async function listFrames() {
-  const frames: FrameSummary[] = [];
-  collectFrames(figma.currentPage as unknown as { children: readonly SceneNode[] }, frames, []);
-  send({ type: 'frames', frames });
-}
-
-function collectFrames(
-  parent: { children?: readonly SceneNode[] },
-  out: FrameSummary[],
-  path: string[]
-) {
-  if (!parent.children) return;
-  for (const child of parent.children) {
-    if (child.type === 'FRAME') {
-      out.push({
-        id: child.id,
-        name: (child as FrameNode).name,
-        path: path.length > 0 ? path.slice() : undefined,
-      });
-    } else if (child.type === 'SECTION') {
-      const section = child as SectionNode;
-      collectFrames(section, out, [...path, section.name]);
+async function refreshFromSelection() {
+  const selection = figma.currentPage.selection;
+  let frame: FrameNode | null = null;
+  for (const node of selection) {
+    const candidate = findFrameAncestor(node);
+    if (candidate) {
+      frame = candidate;
+      break;
     }
   }
-}
-
-// ---------------------------------------------------------------------------
-// Count a frame's text layers and send a preview thumbnail.
-
-async function countFrame(frameId: string) {
-  let frame: BaseNode | null = null;
-  try {
-    if (typeof (figma as any).getNodeByIdAsync === 'function') {
-      frame = await (figma as any).getNodeByIdAsync(frameId);
-    } else {
-      frame = figma.getNodeById(frameId);
-    }
-  } catch {
-    frame = null;
-  }
-  if (!frame || frame.type !== 'FRAME') {
-    figma.notify('That frame is no longer available. Pick another.');
-    send({ type: 'count-result', frameId, frameName: '', items: [] });
+  if (!frame) {
+    send({ type: 'no-selection' });
     return;
   }
-
-  const frameNode = frame as FrameNode;
-  const items = collect(frameNode, false);
+  const items = collect(frame, false);
   send({
     type: 'count-result',
-    frameId,
-    frameName: frameNode.name,
+    frameId: frame.id,
+    frameName: frame.name,
     items,
   });
-
   // Best-effort preview. Width-constrained so the export stays small.
   try {
-    const bytes = await frameNode.exportAsync({
+    const bytes = await frame.exportAsync({
       format: 'PNG',
       constraint: { type: 'WIDTH', value: 480 },
     });
-    send({ type: 'frame-preview', frameId, bytes });
+    send({ type: 'frame-preview', frameId: frame.id, bytes });
   } catch {
     /* preview is non-essential; if export fails the UI just hides the image */
   }
 }
+
+// Walk up from a node to find the nearest FRAME ancestor. If the node itself
+// is a FRAME, that's returned. Returns null if no FRAME is found (e.g. the
+// node lives directly under a SECTION or under the page).
+function findFrameAncestor(node: SceneNode): FrameNode | null {
+  let current: BaseNode | null = node;
+  while (current) {
+    if (current.type === 'FRAME') return current as FrameNode;
+    current = current.parent;
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Auto-update on selection change.
+
+let selectionTimer: ReturnType<typeof setTimeout> | undefined;
+figma.on('selectionchange', () => {
+  if (selectionTimer) clearTimeout(selectionTimer);
+  selectionTimer = setTimeout(() => {
+    selectionTimer = undefined;
+    refreshFromSelection();
+  }, SELECTION_DEBOUNCE_MS);
+});
+
+// Initial run on plugin open.
+refreshFromSelection();

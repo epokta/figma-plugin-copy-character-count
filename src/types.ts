@@ -11,23 +11,14 @@ export interface TextBoxCount {
   charCount: number;
 }
 
-export interface FrameSummary {
-  id: string;
-  name: string;
-  // Optional: path of sections the frame lives in, e.g. ["Benefits", "Login"].
-  // Empty/undefined for frames at the page root.
-  path?: string[];
-}
-
 // UI -> Main messages
 export type UiToMainMessage =
   | { type: 'resize'; width: number; height: number }
-  | { type: 'list-frames' }
-  | { type: 'count-frame'; frameId: string };
+  | { type: 'refresh' };
 
 // Main -> UI messages
 export type MainToUiMessage =
-  | { type: 'frames'; frames: FrameSummary[] }
+  | { type: 'no-selection' }
   | {
       type: 'count-result';
       frameId: string;
